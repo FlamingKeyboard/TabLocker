@@ -1,5 +1,7 @@
 # TabLocker
 
+![icon](https://raw.githubusercontent.com/FlamingKeyboard/TabLocker/refs/heads/main/icons/default-favicon.svg)
+
 A privacy-focused browser extension for securely saving and restoring browser tabs with local encryption.
 
 ## Features

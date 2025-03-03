@@ -13,10 +13,10 @@ chrome.runtime.onInstalled.addListener(async () => {
 });
 
 // Generate a secure encryption key using Web Crypto API
-async function generateAndStoreEncryptionKey() {
+export async function generateAndStoreEncryptionKey() {
   try {
     // Generate a random AES-256 key
-    const key = await crypto.subtle.generateKey(
+    const key = await window.crypto.subtle.generateKey(
       {
         name: 'AES-GCM',
         length: 256
@@ -26,7 +26,7 @@ async function generateAndStoreEncryptionKey() {
     );
     
     // Export the key to raw format
-    const rawKey = await crypto.subtle.exportKey('raw', key);
+    const rawKey = await window.crypto.subtle.exportKey('raw', key);
     
     // Store a flag indicating that the key exists (not the actual key for security)
     await chrome.storage.local.set({ 
@@ -38,6 +38,7 @@ async function generateAndStoreEncryptionKey() {
     console.log('Encryption key generated and stored');
   } catch (error) {
     console.error('Error generating encryption key:', error);
+    throw error;
   }
 }
 
@@ -73,7 +74,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 // Save tabs to storage with encryption
-async function saveTabs(tabs) {
+export async function saveTabs(tabs) {
   try {
     // Get the encryption key
     const storage = await chrome.storage.local.get('encryptionKey');
@@ -85,7 +86,7 @@ async function saveTabs(tabs) {
     const keyData = new Uint8Array(storage.encryptionKey);
     
     // Import the key
-    const key = await crypto.subtle.importKey(
+    const key = await window.crypto.subtle.importKey(
       'raw',
       keyData,
       { name: 'AES-GCM', length: 256 },
@@ -103,10 +104,10 @@ async function saveTabs(tabs) {
     const dataToEncrypt = new TextEncoder().encode(compressedData);
     
     // Generate a random IV (Initialization Vector)
-    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const iv = window.crypto.getRandomValues(new Uint8Array(12));
     
     // Encrypt the data
-    const encryptedData = await crypto.subtle.encrypt(
+    const encryptedData = await window.crypto.subtle.encrypt(
       {
         name: 'AES-GCM',
         iv: iv
@@ -146,7 +147,7 @@ async function saveTabs(tabs) {
 }
 
 // Get saved tabs from storage with decryption
-async function getSavedTabs() {
+export async function getSavedTabs() {
   try {
     // Get the encryption key
     const storage = await chrome.storage.local.get(['encryptionKey', 'savedSessions']);
@@ -163,7 +164,7 @@ async function getSavedTabs() {
     const keyData = new Uint8Array(storage.encryptionKey);
     
     // Import the key
-    const key = await crypto.subtle.importKey(
+    const key = await window.crypto.subtle.importKey(
       'raw',
       keyData,
       { name: 'AES-GCM', length: 256 },
@@ -180,7 +181,7 @@ async function getSavedTabs() {
         const iv = new Uint8Array(session.iv);
         
         // Decrypt the data
-        const decryptedData = await crypto.subtle.decrypt(
+        const decryptedData = await window.crypto.subtle.decrypt(
           {
             name: 'AES-GCM',
             iv: iv
@@ -217,7 +218,7 @@ async function getSavedTabs() {
 }
 
 // Export tabs to a file
-async function exportTabs(sessionId) {
+export async function exportTabs(sessionId) {
   try {
     // Get all saved sessions
     const sessions = await getSavedTabs();
@@ -247,7 +248,7 @@ async function exportTabs(sessionId) {
 }
 
 // Import tabs from a file
-async function importTabs(importData) {
+export async function importTabs(importData) {
   try {
     // Decompress the data
     const decompressedData = LZString.decompressFromUTF16(importData);

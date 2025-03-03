@@ -3,7 +3,7 @@ import { useState, useEffect } from 'preact/hooks';
 import './styles.css';
 
 // Main App component
-const App = () => {
+export default function App() {
   const [status, setStatus] = useState('');
   const [statusType, setStatusType] = useState('info');
   const [sessions, setSessions] = useState([]);
@@ -299,10 +299,10 @@ const App = () => {
       )}
     </div>
   );
-};
+}
 
 // Session item component
-const SessionItem = ({ session, onRestore, onRestoreTab, onExport }) => {
+function SessionItem({ session, onRestore, onRestoreTab, onExport }) {
   const [expanded, setExpanded] = useState(false);
   const sessionDate = new Date(session.date);
   const dateString = sessionDate.toLocaleString();
@@ -346,7 +346,7 @@ const SessionItem = ({ session, onRestore, onRestoreTab, onExport }) => {
       )}
     </div>
   );
-};
+}
 
 // Render the app
 render(<App />, document.getElementById('app'));

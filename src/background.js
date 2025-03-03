@@ -1,5 +1,5 @@
-// Import LZString for compression (will be used in future implementation)
-// import * as LZString from 'lz-string';
+// Import LZString for compression
+import * as LZString from 'lz-string';
 
 // Initialize the extension when installed
 chrome.runtime.onInstalled.addListener(async () => {
@@ -56,6 +56,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true; // Indicates async response
   }
+  
+  if (message.action === 'exportTabs') {
+    exportTabs(message.sessionId)
+      .then(data => sendResponse({ success: true, data }))
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true; // Indicates async response
+  }
+  
+  if (message.action === 'importTabs') {
+    importTabs(message.data)
+      .then(result => sendResponse({ success: true, result }))
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true; // Indicates async response
+  }
 });
 
 // Save tabs to storage with encryption
@@ -82,11 +96,11 @@ async function saveTabs(tabs) {
     // Prepare the data to be encrypted
     const tabsData = JSON.stringify(tabs);
     
-    // Compress the data using LZString (placeholder - will implement later)
-    // const compressedData = LZString.compress(tabsData);
+    // Compress the data using LZString
+    const compressedData = LZString.compress(tabsData);
     
-    // For now, use the uncompressed data
-    const dataToEncrypt = new TextEncoder().encode(tabsData);
+    // Convert to ArrayBuffer for encryption
+    const dataToEncrypt = new TextEncoder().encode(compressedData);
     
     // Generate a random IV (Initialization Vector)
     const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -178,11 +192,11 @@ async function getSavedTabs() {
         // Decode the decrypted data
         const decodedData = new TextDecoder().decode(decryptedData);
         
-        // Decompress the data (placeholder - will implement later)
-        // const decompressedData = LZString.decompress(decodedData);
+        // Decompress the data
+        const decompressedData = LZString.decompress(decodedData);
         
-        // For now, use the uncompressed data
-        const tabs = JSON.parse(decodedData);
+        // Parse the JSON data
+        const tabs = JSON.parse(decompressedData);
         
         sessions.push({
           id: session.id,
@@ -198,6 +212,66 @@ async function getSavedTabs() {
     return sessions;
   } catch (error) {
     console.error('Error getting saved tabs:', error);
+    throw error;
+  }
+}
+
+// Export tabs to a file
+async function exportTabs(sessionId) {
+  try {
+    // Get all saved sessions
+    const sessions = await getSavedTabs();
+    
+    // Find the requested session
+    const session = sessions.find(s => s.id === sessionId);
+    if (!session) {
+      throw new Error('Session not found');
+    }
+    
+    // Prepare the data for export
+    const exportData = {
+      version: '1.0',
+      date: new Date().toISOString(),
+      session: session
+    };
+    
+    // Convert to JSON and compress
+    const jsonData = JSON.stringify(exportData);
+    const compressedData = LZString.compressToUTF16(jsonData);
+    
+    return compressedData;
+  } catch (error) {
+    console.error('Error exporting tabs:', error);
+    throw error;
+  }
+}
+
+// Import tabs from a file
+async function importTabs(importData) {
+  try {
+    // Decompress the data
+    const decompressedData = LZString.decompressFromUTF16(importData);
+    if (!decompressedData) {
+      throw new Error('Invalid import data');
+    }
+    
+    // Parse the JSON data
+    const parsedData = JSON.parse(decompressedData);
+    
+    // Validate the data
+    if (!parsedData.version || !parsedData.session || !parsedData.session.tabs) {
+      throw new Error('Invalid import data format');
+    }
+    
+    // Save the imported tabs
+    const result = await saveTabs(parsedData.session.tabs);
+    
+    return {
+      sessionId: result.sessionId,
+      tabCount: result.tabCount
+    };
+  } catch (error) {
+    console.error('Error importing tabs:', error);
     throw error;
   }
 }

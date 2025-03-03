@@ -1,6 +1,6 @@
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-  width: 350px;
+  width: 400px;
   margin: 0;
   padding: 16px;
   color: #333;
@@ -38,6 +38,8 @@ button:disabled {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
+  border-bottom: 2px solid #4285f4;
+  padding-bottom: 8px;
 }
 
 .header h1 {
@@ -79,10 +81,49 @@ button:disabled {
   padding: 12px;
 }
 
-.sessions-container h2 {
-  margin-top: 0;
+.sessions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 12px;
+}
+
+.sessions-header h2 {
+  margin: 0;
   font-size: 18px;
+}
+
+.search-box input {
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  width: 180px;
+}
+
+.import-export {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 8px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+}
+
+.import-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.import-section input[type="file"] {
+  font-size: 12px;
+}
+
+.loading, .no-sessions {
+  padding: 16px;
+  text-align: center;
+  color: #666;
 }
 
 .session-list {
@@ -97,14 +138,31 @@ button:disabled {
   border: 1px solid #eee;
   border-radius: 4px;
   overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .session-header {
-  padding: 8px;
+  padding: 10px;
   background-color: #f8f9fa;
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.session-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.session-date {
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.tab-count {
+  font-size: 12px;
+  color: #666;
 }
 
 .session-actions {
@@ -112,17 +170,46 @@ button:disabled {
   gap: 4px;
 }
 
+.restore-btn {
+  background-color: #4caf50;
+}
+
+.restore-btn:hover {
+  background-color: #388e3c;
+}
+
+.export-btn {
+  background-color: #ff9800;
+}
+
+.export-btn:hover {
+  background-color: #f57c00;
+}
+
+.toggle-btn {
+  background-color: #9e9e9e;
+}
+
+.toggle-btn:hover {
+  background-color: #757575;
+}
+
 .tab-list {
-  max-height: 200px;
+  max-height: 300px;
   overflow-y: auto;
 }
 
 .tab-item {
-  padding: 8px;
+  padding: 10px;
   border-bottom: 1px solid #eee;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  transition: background-color 0.2s;
+}
+
+.tab-item:hover {
+  background-color: #f5f5f5;
 }
 
 .tab-item:last-child {
@@ -147,4 +234,23 @@ button:disabled {
   padding: 4px 8px;
   font-size: 12px;
   flex-shrink: 0;
+}
+
+.main-view {
+  padding: 16px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+}
+
+.info-section h2 {
+  margin-top: 0;
+  color: #4285f4;
+}
+
+.feature-list {
+  padding-left: 20px;
+}
+
+.feature-list li {
+  margin-bottom: 8px;
 }

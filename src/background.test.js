@@ -29,12 +29,13 @@ jest.mock('./background', () => {
       } else {
         return Promise.resolve({ sessionId: '123', tabCount: 1 });
       }
-    })
+    }),
+    updateSessions: jest.fn().mockResolvedValue({ success: true })
   };
 });
 
 // Import the mocked module
-import { generateAndStoreEncryptionKey, saveTabs, getSavedTabs, exportTabs, importTabs } from './background';
+import { generateAndStoreEncryptionKey, saveTabs, getSavedTabs, exportTabs, importTabs, updateSessions } from './background';
 
 // Mock the chrome API responses
 beforeEach(() => {
@@ -168,6 +169,32 @@ describe('Background Script', () => {
     
     it('should reject invalid import data', async () => {
       await expect(importTabs('invalid-data')).rejects.toThrow('Invalid import data');
+    });
+  });
+  
+  describe('updateSessions', () => {
+    it('should update sessions with reordered tabs', async () => {
+      const mockSessions = [
+        {
+          id: '123',
+          tabs: [
+            { id: 1, url: 'https://example.com', title: 'Example 1' },
+            { id: 2, url: 'https://example.org', title: 'Example 2' }
+          ]
+        }
+      ];
+      
+      const result = await updateSessions(mockSessions);
+      
+      expect(result).toEqual({ success: true });
+      expect(updateSessions).toHaveBeenCalledWith(mockSessions);
+    });
+    
+    it('should handle errors when updating sessions', async () => {
+      // Mock a failure
+      updateSessions.mockRejectedValueOnce(new Error('Update error'));
+      
+      await expect(updateSessions([])).rejects.toThrow('Update error');
     });
   });
 });

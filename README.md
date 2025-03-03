@@ -6,12 +6,14 @@ A privacy-focused browser extension for securely saving and restoring browser ta
 
 ## Features
 
-- **Tab Management**: Save all open tabs, restore individual tabs or entire sessions
-- **Security**: All data is encrypted locally using AES-256-GCM via the Web Crypto API
-- **Privacy**: No cloud storage or external services - all data stays on your device
-- **Compression**: Uses LZString to compress data before encryption for efficient storage
-- **Export/Import**: Export and import your saved tabs as encrypted files
-- **Search**: Find saved tabs by title or URL
+- **Secure Tab Management**: Save and restore your tabs with local encryption
+- **Privacy-Focused**: All data is stored locally, nothing is sent to any server
+- **Memory Savings**: Free up browser memory by saving tabs you're not using right now
+- **Drag and Drop**: Easily reorder tabs within and between sessions
+- **Full Dashboard**: Access a dedicated dashboard page for better tab management
+- **Export/Import**: Share your saved tabs between devices or create backups
+- **Search**: Quickly find tabs across all your saved sessions
+- **Star Sessions**: Mark important sessions for quick access
 
 ## Technical Details
 
@@ -26,6 +28,10 @@ All data is stored locally using the browser's storage API. No data is sent to a
 ### Compression
 
 TabLocker uses LZString to compress tab data before encryption, reducing storage requirements and enabling more efficient export/import.
+
+### UI Framework
+
+The user interface is built using Preact, a lightweight alternative to React, providing a fast and responsive experience.
 
 ## Installation
 
@@ -54,8 +60,12 @@ TabLocker uses LZString to compress tab data before encryption, reducing storage
 
 1. Click the TabLocker icon in your browser toolbar
 2. Use "Save All Tabs" to save your current tabs
-3. Use "Restore Tabs" to view and restore previously saved tabs
+3. View and manage your saved sessions directly in the main view
 4. Search through your saved tabs using the search box
+5. Star important sessions to keep them at the top of the list
+6. Drag and drop tabs to reorder them within or between sessions
+7. Export sessions as encrypted files or copy URLs to clipboard
+8. Import previously exported sessions
 
 ## Development
 
@@ -73,25 +83,31 @@ TabLocker uses LZString to compress tab data before encryption, reducing storage
 
 - `npm run build`: Build the extension
 - `npm run watch`: Watch for changes and rebuild automatically
+- `npm test`: Run the Jest test suite
 
 ### Project Structure
 
 - `src/`: Source code
   - `background.js`: Background service worker for handling tab operations and encryption
   - `popup.js`: Preact-based UI for the extension popup
+  - `dragdrop.js`: Drag and drop functionality for tab reordering
   - `styles.css`: Styling for the UI
 - `icons/`: Extension icons
 - `manifest.json`: Extension manifest file
 - `webpack.config.js`: Webpack configuration
+- `__tests__/`: Test files
+  - `background.test.js`: Tests for background script functionality
+  - `popup.test.js`: Tests for UI interactions
 
 ## Future Enhancements
 
 - QR code export/import for small datasets
 - PIN-based unlocking for additional security
 - Higher compression ratio using LZMA for QR code exports
-- Tab grouping and organization features
+- Advanced tab grouping and organization features
 - Keyboard shortcuts for common operations
 - Dark mode support
+- Customizable UI themes
 
 ## License
 

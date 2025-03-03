@@ -1,5 +1,6 @@
 import { h, render } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
+import { initDragAndDrop, reorderTabs } from './dragdrop';
 import './styles.css';
 
 // Main App component
@@ -8,9 +9,11 @@ export default function App() {
   const [statusType, setStatusType] = useState('info');
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [view, setView] = useState('main'); // 'main', 'sessions'
   const [searchQuery, setSearchQuery] = useState('');
   const [importFile, setImportFile] = useState(null);
+  const [memorySaved, setMemorySaved] = useState(0);
+  const [starredSessions, setStarredSessions] = useState({});
+  const sessionListRef = useRef(null);
 
   // Load saved sessions
   const loadSessions = async () => {
@@ -22,6 +25,18 @@ export default function App() {
       
       if (response.success) {
         setSessions(response.tabs);
+        
+        // Load starred sessions from storage
+        const starredData = await chrome.storage.local.get('starredSessions');
+        if (starredData.starredSessions) {
+          setStarredSessions(starredData.starredSessions);
+        }
+        
+        // Calculate approximate memory saved (based on OneTab's claim of up to 95% memory savings)
+        const totalTabs = response.tabs.reduce((count, session) => count + session.tabs.length, 0);
+        // Rough estimate: 100MB per tab saved
+        const estimatedMemorySaved = totalTabs * 100;
+        setMemorySaved(estimatedMemorySaved);
       } else {
         showStatus(`Error: ${response.error}`, 'error');
       }
@@ -55,8 +70,6 @@ export default function App() {
         showStatus(`Saved ${response.result.tabCount} tabs successfully!`, 'success');
         // Reload sessions after saving
         loadSessions();
-        // Switch to sessions view
-        setView('sessions');
       } else {
         showStatus(`Error: ${response.error}`, 'error');
       }
@@ -87,6 +100,54 @@ export default function App() {
   const restoreTab = (url) => {
     chrome.tabs.create({ url });
     showStatus('Tab restored', 'success');
+  };
+
+  // Delete a session
+  const deleteSession = async (sessionId) => {
+    try {
+      // Get existing saved sessions
+      const existingData = await chrome.storage.local.get('savedSessions');
+      const savedSessions = existingData.savedSessions || [];
+      
+      // Filter out the session to delete
+      const updatedSessions = savedSessions.filter(session => session.id !== sessionId);
+      
+      // Save the updated sessions
+      await chrome.storage.local.set({ savedSessions: updatedSessions });
+      
+      // Update the UI
+      loadSessions();
+      
+      showStatus('Session deleted successfully', 'success');
+    } catch (error) {
+      showStatus(`Error deleting session: ${error.message}`, 'error');
+    }
+  };
+
+  // Toggle starred status for a session
+  const toggleStarred = async (sessionId) => {
+    try {
+      const updatedStarred = { ...starredSessions };
+      
+      if (updatedStarred[sessionId]) {
+        delete updatedStarred[sessionId];
+      } else {
+        updatedStarred[sessionId] = true;
+      }
+      
+      // Save to storage
+      await chrome.storage.local.set({ starredSessions: updatedStarred });
+      
+      // Update state
+      setStarredSessions(updatedStarred);
+      
+      showStatus(
+        updatedStarred[sessionId] ? 'Session starred' : 'Session unstarred', 
+        'success'
+      );
+    } catch (error) {
+      showStatus(`Error updating starred status: ${error.message}`, 'error');
+    }
   };
 
   // Export session to file
@@ -125,6 +186,27 @@ export default function App() {
     } catch (error) {
       showStatus(`Error exporting session: ${error.message}`, 'error');
     }
+  };
+
+  // Export session as plain text URLs
+  const exportAsText = (sessionId) => {
+    const session = sessions.find(s => s.id === sessionId);
+    if (!session) {
+      showStatus('Session not found', 'error');
+      return;
+    }
+    
+    // Create a text list of URLs
+    const urlList = session.tabs.map(tab => tab.url).join('\n');
+    
+    // Copy to clipboard
+    navigator.clipboard.writeText(urlList)
+      .then(() => {
+        showStatus('URLs copied to clipboard', 'success');
+      })
+      .catch(error => {
+        showStatus(`Error copying to clipboard: ${error.message}`, 'error');
+      });
   };
 
   // Handle file import
@@ -176,6 +258,31 @@ export default function App() {
     }
   };
 
+  // Handle tab reordering
+  const handleTabReorder = async (reorderInfo) => {
+    try {
+      // Update the sessions data with the reordered tabs
+      const updatedSessions = reorderTabs(sessions, reorderInfo);
+      
+      // Update the state with the new order
+      setSessions(updatedSessions);
+      
+      // Save the updated sessions to storage
+      const response = await chrome.runtime.sendMessage({
+        action: 'updateSessions',
+        sessions: updatedSessions
+      });
+      
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to update sessions');
+      }
+      
+      showStatus('Tab order updated', 'success');
+    } catch (error) {
+      showStatus(`Error reordering tabs: ${error.message}`, 'error');
+    }
+  };
+
   // Filter sessions based on search query
   const filteredSessions = sessions.map(session => {
     if (!searchQuery) return session;
@@ -191,6 +298,16 @@ export default function App() {
     };
   }).filter(session => session.tabs.length > 0);
 
+  // Sort sessions with starred ones first
+  const sortedSessions = [...filteredSessions].sort((a, b) => {
+    // Starred sessions come first
+    if (starredSessions[a.id] && !starredSessions[b.id]) return -1;
+    if (!starredSessions[a.id] && starredSessions[b.id]) return 1;
+    
+    // Then sort by date (newest first)
+    return new Date(b.date) - new Date(a.date);
+  });
+
   // Show status message
   const showStatus = (message, type = 'info') => {
     setStatus(message);
@@ -203,6 +320,25 @@ export default function App() {
     }, 3000);
   };
 
+  // Open dashboard page
+  const openDashboard = () => {
+    chrome.tabs.create({
+      url: chrome.runtime.getURL('dashboard.html')
+    });
+    window.close(); // Close the popup
+  };
+
+  // Initialize drag and drop after the component mounts and sessions are loaded
+  useEffect(() => {
+    if (sessionListRef.current && sessions.length > 0) {
+      console.log('Initializing drag and drop with', sessions.length, 'sessions');
+      // Small delay to ensure the DOM is fully rendered
+      setTimeout(() => {
+        initDragAndDrop(sessionListRef.current, handleTabReorder);
+      }, 100);
+    }
+  }, [sessions]);
+
   // Load sessions when the component mounts
   useEffect(() => {
     loadSessions();
@@ -210,8 +346,30 @@ export default function App() {
 
   return (
     <div className="container">
-      <div className="header">
+      <div className="popup-header">
         <h1>TabLocker</h1>
+        {memorySaved > 0 && (
+          <div className="memory-saved">
+            ~{memorySaved} MB memory saved
+          </div>
+        )}
+        <button 
+          className="dashboard-button" 
+          onClick={openDashboard}
+          title="Open full dashboard"
+          style={{
+            backgroundColor: '#4285f4',
+            color: 'white',
+            padding: '8px 16px',
+            borderRadius: '4px',
+            border: 'none',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            marginLeft: '10px'
+          }}
+        >
+          Open Dashboard
+        </button>
       </div>
       
       {status && (
@@ -221,80 +379,63 @@ export default function App() {
       )}
       
       <div className="action-buttons">
-        <button onClick={saveAllTabs} disabled={loading}>
+        <button 
+          className="save-button" 
+          onClick={saveAllTabs} 
+          disabled={loading}
+        >
           {loading ? 'Saving...' : 'Save All Tabs'}
         </button>
-        <button onClick={() => setView(view === 'main' ? 'sessions' : 'main')}>
-          {view === 'main' ? 'View Saved Tabs' : 'Back to Main'}
-        </button>
+        
+        <div className="search-box">
+          <input
+            type="text"
+            placeholder="Search tabs..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
       </div>
       
-      {view === 'sessions' && (
-        <div className="sessions-container">
-          <div className="sessions-header">
-            <h2>Saved Sessions</h2>
-            <div className="search-box">
-              <input
-                type="text"
-                placeholder="Search tabs..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-          </div>
-          
-          <div className="import-export">
-            <div className="import-section">
-              <input
-                type="file"
-                id="import-file"
-                accept=".tldata"
-                onChange={handleFileChange}
-              />
-              <button onClick={importTabs} disabled={!importFile}>
-                Import Tabs
-              </button>
-            </div>
-          </div>
-          
-          {loading ? (
-            <div className="loading">Loading...</div>
-          ) : filteredSessions.length === 0 ? (
-            <div className="no-sessions">
-              {sessions.length === 0 ? 'No saved sessions found.' : 'No matching tabs found.'}
-            </div>
-          ) : (
-            <div className="session-list">
-              {filteredSessions.map(session => (
-                <SessionItem 
-                  key={session.id} 
-                  session={session} 
-                  onRestore={() => restoreSession(session.id)}
-                  onRestoreTab={restoreTab}
-                  onExport={() => exportSession(session.id)}
-                />
-              ))}
-            </div>
-          )}
+      <div className="import-export-bar">
+        <div className="import-section">
+          <input
+            type="file"
+            id="import-file"
+            accept=".tldata"
+            onChange={handleFileChange}
+          />
+          <button 
+            className="import-button" 
+            onClick={importTabs} 
+            disabled={!importFile}
+          >
+            Import
+          </button>
         </div>
-      )}
+      </div>
       
-      {view === 'main' && (
-        <div className="main-view">
-          <div className="info-section">
-            <h2>Welcome to TabLocker</h2>
-            <p>
-              TabLocker helps you save and organize your browser tabs securely.
-              All data is encrypted and stored locally on your device.
-            </p>
-            <ul className="feature-list">
-              <li>Save all your open tabs with one click</li>
-              <li>Restore tabs individually or all at once</li>
-              <li>Search through your saved tabs</li>
-              <li>Export and import your saved tabs</li>
-              <li>All data is encrypted with AES-256-GCM</li>
-            </ul>
-          </div>
+      {loading ? (
+        <div className="loading">Loading...</div>
+      ) : sortedSessions.length === 0 ? (
+        <div className="no-sessions">
+          {sessions.length === 0 ? 'No saved sessions found.' : 'No matching tabs found.'}
+        </div>
+      ) : (
+        <div className="session-list" ref={sessionListRef}>
+          {sortedSessions.map(session => (
+            <SessionItem 
+              key={session.id} 
+              session={session} 
+              isStarred={!!starredSessions[session.id]}
+              onRestore={() => restoreSession(session.id)}
+              onRestoreTab={restoreTab}
+              onDelete={() => deleteSession(session.id)}
+              onExport={() => exportSession(session.id)}
+              onExportText={() => exportAsText(session.id)}
+              onToggleStar={() => toggleStarred(session.id)}
+            />
+          ))}
         </div>
       )}
     </div>
@@ -302,31 +443,63 @@ export default function App() {
 }
 
 // Session item component
-function SessionItem({ session, onRestore, onRestoreTab, onExport }) {
-  const [expanded, setExpanded] = useState(false);
+function SessionItem({ 
+  session, 
+  isStarred,
+  onRestore, 
+  onRestoreTab, 
+  onDelete,
+  onExport, 
+  onExportText,
+  onToggleStar
+}) {
+  // Start with expanded view for better usability with drag and drop
+  const [expanded, setExpanded] = useState(true);
   const sessionDate = new Date(session.date);
   const dateString = sessionDate.toLocaleString();
   
   return (
-    <div className="session-item">
+    <div className={`session-item ${isStarred ? 'starred' : ''}`} data-session-id={session.id}>
       <div className="session-header">
         <div className="session-info">
-          <span className="session-date">{dateString}</span>
+          <div className="session-title-row">
+            <button 
+              className={`star-button ${isStarred ? 'starred' : ''}`} 
+              onClick={onToggleStar}
+              title={isStarred ? "Unstar this session" : "Star this session"}
+            >
+              {isStarred ? '★' : '☆'}
+            </button>
+            <span className="session-date">{dateString}</span>
+          </div>
           <span className="tab-count">{session.tabs.length} tabs</span>
         </div>
         <div className="session-actions">
-          <button className="restore-btn" onClick={onRestore}>Restore All</button>
-          <button className="export-btn" onClick={onExport}>Export</button>
-          <button className="toggle-btn" onClick={() => setExpanded(!expanded)}>
-            {expanded ? 'Hide' : 'Show'}
+          <button className="restore-btn" onClick={onRestore} title="Restore all tabs">
+            Restore All
+          </button>
+          <div className="dropdown">
+            <button className="dropdown-btn">⋮</button>
+            <div className="dropdown-content">
+              <button onClick={onExport}>Export as File</button>
+              <button onClick={onExportText}>Copy URLs to Clipboard</button>
+              <button onClick={onDelete} className="delete-btn">Delete</button>
+            </div>
+          </div>
+          <button 
+            className="toggle-btn" 
+            onClick={() => setExpanded(!expanded)}
+            title={expanded ? "Hide tabs" : "Show tabs"}
+          >
+            {expanded ? '▲' : '▼'}
           </button>
         </div>
       </div>
       
       {expanded && (
         <div className="tab-list">
-          {session.tabs.map(tab => (
-            <div key={tab.id} className="tab-item">
+          {session.tabs.map((tab, index) => (
+            <div key={tab.id} className="tab-item" data-index={index}>
               <img 
                 className="favicon" 
                 src={tab.favIconUrl || 'icons/default-favicon.svg'} 
@@ -337,6 +510,7 @@ function SessionItem({ session, onRestore, onRestoreTab, onExport }) {
               <button 
                 className="open-tab-btn"
                 onClick={() => onRestoreTab(tab.url)}
+                title="Open this tab"
               >
                 Open
               </button>

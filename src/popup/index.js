@@ -71,10 +71,6 @@ function Popup() {
           <div className="loading">Loading...</div>
         ) : (
           <>
-            <div className="tab-count">
-              {tabs.length} tab{tabs.length !== 1 ? 's' : ''} in this window
-            </div>
-            
             {message && (
               <div className={`message message-${message.type}`}>
                 {message.text}

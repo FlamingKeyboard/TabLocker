@@ -1,1 +1,9 @@
 node_modules
+dist
+dist/*
+icons
+manifest.json
+jest.config.js
+package-lock.json
+package.json
+webpack.config.js

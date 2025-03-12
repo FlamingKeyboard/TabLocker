@@ -5,12 +5,17 @@
  * and configuration options.
  */
 
-import { h, render } from 'preact';
+import { h, render, Fragment } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import StorageService from '../services/StorageService';
 import ExportImportService from '../services/ExportImportService';
 import TabService from '../services/TabService';
+import { createNotificationManager } from '../components/Toast';
 import './options.css';
+import './toast.css';
+
+// Create a simple notification manager
+const notificationManager = createNotificationManager();
 
 // Tab Group Component
 function TabGroup({ group, onRestore, onDelete, onRestoreTab, onReorderTabs, onUpdateGroup, onUpdateTab, dragHandleProps }) {
@@ -378,45 +383,25 @@ function Search({ onSearch }) {
 }
 
 // Export/Import Component
-function ExportImport({ onImport }) {
+function ExportImport({ onImport, showToast }) {
   const [exportPassword, setExportPassword] = useState('');
   const [importPassword, setImportPassword] = useState('');
   const [importText, setImportText] = useState('');
-  const [message, setMessage] = useState(null);
-  const [toast, setToast] = useState(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const exportImportService = new ExportImportService();
   const storageService = new StorageService();
   const fileInputRef = useRef(null);
-  
-  const showToast = (message, actions) => {
-    setToast({ message, actions });
-    // Auto-hide toast after 10 seconds if it's just a message without actions
-    if (!actions) {
-      setTimeout(() => {
-        hideToast();
-      }, 10000);
-    }
-  };
-
-  const hideToast = () => {
-    const toastElement = document.querySelector('.toast');
-    if (toastElement) {
-      toastElement.classList.add('hiding');
-      setTimeout(() => {
-        setToast(null);
-      }, 300);
-    } else {
-      setToast(null);
-    }
-  };
+  const dragDropAreaRef = useRef(null);
 
   const handleExport = async (format) => {
     try {
+      setIsExporting(true);
       // Get all tab groups
       const groups = await storageService.getAllTabGroups();
       
       if (groups.length === 0) {
-        showToast('No tab groups to export');
+        showToast('No tab groups to export', 'warning');
         return;
       }
       
@@ -461,30 +446,56 @@ function ExportImport({ onImport }) {
       
       // Return early if no export data
       if (!exportData) {
+        setIsExporting(false);
         return;
       }
 
-      showToast('Choose how to export your tabs:', [
-        {
-          label: 'Save to File',
-          onClick: () => {
-            exportImportService.downloadAsFile(exportData, filename);
-            showToast('Export saved to file successfully!');
-          },
-          primary: true
-        },
-        {
-          label: 'Copy to Clipboard',
-          onClick: async () => {
-            const copySuccess = await exportImportService.copyToClipboard(exportData);
-            if (copySuccess) {
-              showToast('Export copied to clipboard!');
-            } else {
-              showToast('Failed to copy to clipboard');
-            }
-          }
+      // Show export options dialog with download and copy options
+      const dialog = document.createElement('div');
+      dialog.className = 'export-options-dialog';
+      dialog.innerHTML = `
+        <div class="export-options-content">
+          <h3>Export Options</h3>
+          <div class="export-options-buttons">
+            <button class="download-btn">Download as File</button>
+            <button class="copy-btn">Copy to Clipboard</button>
+          </div>
+          <button class="close-btn">&times;</button>
+        </div>
+      `;
+      
+      document.body.appendChild(dialog);
+      
+      // Add event listeners
+      dialog.querySelector('.download-btn').addEventListener('click', () => {
+        exportImportService.downloadAsFile(exportData, filename);
+        showToast('Export saved to file successfully!', 'success');
+        document.body.removeChild(dialog);
+      });
+      
+      dialog.querySelector('.copy-btn').addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(exportData);
+          showToast('Copied to clipboard!', 'success');
+        } catch (error) {
+          console.error('Failed to copy:', error);
+          showToast('Failed to copy to clipboard', 'error');
         }
-      ]);
+        document.body.removeChild(dialog);
+      });
+      
+      dialog.querySelector('.close-btn').addEventListener('click', () => {
+        document.body.removeChild(dialog);
+      });
+      
+      // Close on click outside
+      dialog.addEventListener('click', (e) => {
+        if (e.target === dialog) {
+          document.body.removeChild(dialog);
+        }
+      });
+      
+      setIsExporting(false);
     } catch (error) {
       console.error('Export error:', error);
       showToast(`Export failed: ${error.message}`);
@@ -494,9 +505,11 @@ function ExportImport({ onImport }) {
   const handleImport = async () => {
     try {
       if (!importText.trim()) {
-        showToast('Please enter import data');
+        showToast('Please enter import data', 'warning');
         return;
       }
+      
+      setIsImporting(true);
       
       if (importPassword) {
         exportImportService.setPassword(importPassword);
@@ -506,20 +519,22 @@ function ExportImport({ onImport }) {
       
       if (result.type === 'tablocker') {
         // Handle TabLocker format import
-        showToast('TabLocker import successful!');
+        showToast('TabLocker import successful!', 'success');
         onImport(result.data);
       } else if (result.type === 'onetab') {
         // Handle OneTab format import
-        showToast('OneTab import successful!');
+        showToast('OneTab import successful!', 'success');
         onImport(result.data);
       }
+      setIsImporting(false);
       
       // Clear the import form
       setImportText('');
       setImportPassword('');
     } catch (error) {
       console.error('Import error:', error);
-      showToast(`Import failed: ${error.message}`);
+      showToast(`Import failed: ${error.message}`, 'error');
+      setIsImporting(false);
     }
   };
 
@@ -530,7 +545,8 @@ function ExportImport({ onImport }) {
       if (!file) {
         return;
       }
-
+      
+      setIsImporting(true);
       const reader = new FileReader();
       
       reader.onload = async (e) => {
@@ -547,10 +563,10 @@ function ExportImport({ onImport }) {
             const result = await exportImportService.autoImport(fileContent, importPassword);
             
             if (result.type === 'tablocker') {
-              showToast('TabLocker import successful!');
+              showToast('TabLocker import successful!', 'success');
               onImport(result.data);
             } else if (result.type === 'onetab') {
-              showToast('OneTab import successful!');
+              showToast('OneTab import successful!', 'success');
               onImport(result.data);
             }
             
@@ -558,9 +574,11 @@ function ExportImport({ onImport }) {
             setImportText('');
             setImportPassword('');
           }
+          setIsImporting(false);
         } catch (error) {
           console.error('File import error:', error);
-          showToast(`File import failed: ${error.message}`);
+          showToast(`File import failed: ${error.message}`, 'error');
+          setIsImporting(false);
         }
       };
       
@@ -585,30 +603,65 @@ function ExportImport({ onImport }) {
     }
   };
   
+  // Set up drag and drop handlers
+  useEffect(() => {
+    const dragDropArea = dragDropAreaRef.current;
+    if (!dragDropArea) return;
+    
+    const handleDragOver = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragDropArea.classList.add('dragover');
+    };
+    
+    const handleDragLeave = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragDropArea.classList.remove('dragover');
+    };
+    
+    const handleDrop = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragDropArea.classList.remove('dragover');
+      
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        const fileInput = fileInputRef.current;
+        if (fileInput) {
+          // Create a new FileList-like object or directly set the files
+          try {
+            // Modern browsers
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(e.dataTransfer.files[0]);
+            fileInput.files = dataTransfer.files;
+          } catch (error) {
+            // Fallback for older browsers
+            console.error('DataTransfer not supported:', error);
+            // Just trigger the file input click as fallback
+            triggerFileInput();
+            return;
+          }
+          
+          // Trigger the change event manually
+          const event = new Event('change', { bubbles: true });
+          fileInput.dispatchEvent(event);
+        }
+      }
+    };
+    
+    dragDropArea.addEventListener('dragover', handleDragOver);
+    dragDropArea.addEventListener('dragleave', handleDragLeave);
+    dragDropArea.addEventListener('drop', handleDrop);
+    
+    return () => {
+      dragDropArea.removeEventListener('dragover', handleDragOver);
+      dragDropArea.removeEventListener('dragleave', handleDragLeave);
+      dragDropArea.removeEventListener('drop', handleDrop);
+    };
+  }, []);
+  
   return (
     <div className="export-import-container">
-      {/* Toast notification */}
-      {toast && (
-        <div className="toast">
-          <div className="toast-message">{toast.message}</div>
-          {toast.actions && (
-            <div className="toast-actions">
-              {toast.actions.map((action, index) => (
-                <button
-                  key={index}
-                  className={`btn ${action.primary ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => {
-                    action.onClick();
-                    hideToast();
-                  }}
-                >
-                  {action.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
       
       <div className="card">
         <div className="card-header">
@@ -680,13 +733,15 @@ function ExportImport({ onImport }) {
               className="btn btn-primary" 
               onClick={handleImport}
               title="Import from pasted text"
+              disabled={isImporting}
             >
-              Import
+              {isImporting ? 'Importing...' : 'Import'}
             </button>
             <button 
               className="btn btn-secondary" 
               onClick={triggerFileInput}
               title="Import from file"
+              disabled={isImporting}
             >
               Import from File
             </button>
@@ -697,6 +752,15 @@ function ExportImport({ onImport }) {
               onChange={handleFileImport}
               style={{ display: 'none' }}
             />
+          </div>
+          
+          {/* Drag and drop area */}
+          <div 
+            className="drag-drop-area" 
+            ref={dragDropAreaRef}
+            onClick={triggerFileInput}
+          >
+            <p>Drag and drop a file here or click to select</p>
           </div>
         </div>
       </div>
@@ -843,7 +907,15 @@ function Options() {
     autoBackup: true,
     password: '' // Add encryption password to settings
   });
-  const [message, setMessage] = useState(null);
+  // Simple notification helper function - only show for errors
+  const showToast = (message, type = 'info') => {
+    // Only display notifications for errors
+    if (type === 'error') {
+      notificationManager.showNotification(message, type);
+    }
+    // For non-errors, we can log to console for debugging if needed
+    console.log(`${type}: ${message}`);
+  };
   
   const storageService = new StorageService();
   const tabService = new TabService();
@@ -856,7 +928,7 @@ function Options() {
         await loadSettings();
       } catch (error) {
         console.error('Error loading data:', error);
-        setMessage({ type: 'error', text: 'Error loading data' });
+        showToast('Error loading data', 'error');
       } finally {
         setLoading(false);
       }
@@ -1023,13 +1095,10 @@ function Options() {
       // Reload tab groups
       await loadTabGroups();
       
-      setMessage({ type: 'success', text: 'Tab group deleted!' });
-      
-      // Clear message after 2 seconds
-      setTimeout(() => setMessage(null), 2000);
+      showToast('Tab group deleted!', 'success');
     } catch (error) {
       console.error('Error deleting tab group:', error);
-      setMessage({ type: 'error', text: `Error deleting tab group: ${error.message}` });
+      showToast(`Error deleting tab group: ${error.message}`, 'error');
     }
   };
   
@@ -1052,11 +1121,10 @@ function Options() {
         await storageService.updateTabGroup(groupId, updates);
       }
       
-      setMessage({ type: 'success', text: 'Group updated!' });
-      setTimeout(() => setMessage(null), 2000);
+      showToast('Group updated!', 'success');
     } catch (error) {
       console.error('Error updating group:', error);
-      setMessage({ type: 'error', text: `Error updating group: ${error.message}` });
+      showToast(`Error updating group: ${error.message}`, 'error');
     }
   };
   
@@ -1086,11 +1154,10 @@ function Options() {
       // Save to storage
       await storageService.updateTabGroup(groupId, { tabs });
       
-      setMessage({ type: 'success', text: 'Tab updated!' });
-      setTimeout(() => setMessage(null), 2000);
+      showToast('Tab updated!', 'success');
     } catch (error) {
       console.error('Error updating tab:', error);
-      setMessage({ type: 'error', text: `Error updating tab: ${error.message}` });
+      showToast(`Error updating tab: ${error.message}`, 'error');
     }
   };
 
@@ -1121,11 +1188,10 @@ function Options() {
       // Save to storage
       await storageService.updateTabGroup(groupId, { tabs });
       
-      setMessage({ type: 'success', text: 'Tab order updated!' });
-      setTimeout(() => setMessage(null), 2000);
+      showToast('Tab order updated!', 'success');
     } catch (error) {
       console.error('Error reordering tabs:', error);
-      setMessage({ type: 'error', text: `Error updating tab order: ${error.message}` });
+      showToast(`Error updating tab order: ${error.message}`, 'error');
     }
   };
   
@@ -1173,8 +1239,7 @@ function Options() {
         // Wait for all updates to complete
         await Promise.all(updatePromises);
         
-        setMessage({ type: 'success', text: 'Group order updated!' });
-        setTimeout(() => setMessage(null), 2000);
+        showToast('Group order updated!', 'success');
       } catch (error) {
         console.error('Error reordering groups:', error);
         setMessage({ type: 'error', text: `Error updating group order: ${error.message}` });
@@ -1274,11 +1339,7 @@ function Options() {
       </nav>
       
       <main className="app-content">
-        {message && (
-          <div className={`message message-${message.type}`}>
-            {message.text}
-          </div>
-        )}
+        {/* Notifications are now created dynamically by the notification manager */}
         
         {activeTab === 'tabs' && (
           <div className="tabs-container">
@@ -1323,7 +1384,7 @@ function Options() {
         )}
         
         {activeTab === 'export-import' && (
-          <ExportImport onImport={handleImport} />
+          <ExportImport onImport={handleImport} showToast={showToast} />
         )}
         
         {activeTab === 'settings' && (

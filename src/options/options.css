@@ -361,6 +361,31 @@ small {
   gap: 16px;
 }
 
+/* Group container for drag and drop */
+.group-container {
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: grab;
+}
+
+.group-container:active {
+  cursor: grabbing;
+}
+
+.group-dragging {
+  opacity: 0.7;
+  transform: scale(1.02);
+  z-index: 10;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
+.group-drag-over {
+  border: 2px dashed var(--primary-color);
+  padding: 4px;
+  margin: -4px;
+  border-radius: 6px;
+}
+
 .tab-group {
   background-color: white;
   border-radius: 6px;
@@ -374,10 +399,67 @@ small {
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid var(--gray-200);
+  cursor: grab;
+}
+
+.tab-group-header:active {
+  cursor: grabbing;
 }
 
 .tab-group-info {
   flex: 1;
+}
+
+.group-name-container {
+  display: flex;
+  align-items: center;
+}
+
+.edit-group-name-form {
+  width: 100%;
+  max-width: 300px;
+}
+
+.edit-group-name-input {
+  width: 100%;
+  padding: 4px 8px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.edit-tab-form {
+  width: 100%;
+}
+
+.edit-tab-input {
+  width: 100%;
+  padding: 2px 6px;
+  font-size: 14px;
+}
+
+.btn-icon {
+  background: none;
+  border: none;
+  font-size: 14px;
+  color: var(--gray-500);
+  cursor: pointer;
+  padding: 2px 6px;
+  margin-left: 6px;
+  opacity: 0.7;
+  border-radius: 3px;
+  display: none;
+}
+
+.btn-icon:hover {
+  background-color: var(--gray-200);
+  color: var(--primary-color);
+  opacity: 1;
+}
+
+.tab-group-name:hover .btn-icon,
+.tab-title:hover .btn-icon,
+.tab-url:hover .btn-icon {
+  display: inline-block;
 }
 
 .tab-group-name {
@@ -411,6 +493,27 @@ small {
   display: flex;
   align-items: center;
   gap: 12px;
+  cursor: grab;
+  transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tab-item:active {
+  cursor: grabbing;
+}
+
+.tab-dragging {
+  opacity: 0.7;
+  transform: scale(1.02);
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.tab-drag-over {
+  border: 2px dashed var(--primary-color);
+  padding: 10px 14px;
+  margin: -10px -14px;
+  border-radius: 4px;
+  background-color: rgba(44, 107, 237, 0.05);
 }
 
 .tab-item:last-child {
@@ -440,6 +543,15 @@ small {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  cursor: pointer;
+  padding: 2px 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.tab-title:hover {
+  color: var(--primary-color);
 }
 
 .tab-url {
@@ -448,6 +560,15 @@ small {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  cursor: pointer;
+  padding: 2px 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.tab-url:hover {
+  color: var(--primary-color);
 }
 
 /* Export/Import styles */

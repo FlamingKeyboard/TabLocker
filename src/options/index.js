@@ -13,8 +13,15 @@ import TabService from '../services/TabService';
 import './options.css';
 
 // Tab Group Component
-function TabGroup({ group, onRestore, onDelete, onRestoreTab }) {
+function TabGroup({ group, onRestore, onDelete, onRestoreTab, onReorderTabs, onUpdateGroup, onUpdateTab, dragHandleProps }) {
   const [expanded, setExpanded] = useState(false);
+  const [draggedTabIndex, setDraggedTabIndex] = useState(null);
+  const [dragOverTabIndex, setDragOverTabIndex] = useState(null);
+  const [isEditingGroupName, setIsEditingGroupName] = useState(false);
+  const [groupName, setGroupName] = useState(group.name);
+  const [editingTabIndex, setEditingTabIndex] = useState(null);
+  const [editingTabField, setEditingTabField] = useState(null); // 'title' or 'url'
+  const [editingTabValue, setEditingTabValue] = useState('');
   
   // Format date from timestamp
   const formatDate = (timestamp) => {
@@ -22,11 +29,94 @@ function TabGroup({ group, onRestore, onDelete, onRestoreTab }) {
     return new Date(timestamp).toLocaleString();
   };
   
+  // Handle tab drag start
+  const handleTabDragStart = (index) => {
+    setDraggedTabIndex(index);
+  };
+
+  // Handle tab drag over
+  const handleTabDragOver = (e, index) => {
+    e.preventDefault();
+    if (draggedTabIndex !== null && draggedTabIndex !== index) {
+      setDragOverTabIndex(index);
+    }
+  };
+
+  // Handle tab drop
+  const handleTabDrop = (e, index) => {
+    e.preventDefault();
+    if (draggedTabIndex !== null && draggedTabIndex !== index) {
+      // Call parent handler to update tabs order
+      onReorderTabs(group.id, draggedTabIndex, index);
+      setDraggedTabIndex(null);
+      setDragOverTabIndex(null);
+    }
+  };
+
+  // Reset drag states
+  const handleTabDragEnd = () => {
+    setDraggedTabIndex(null);
+    setDragOverTabIndex(null);
+  };
+
   return (
-    <div className="tab-group">
-      <div className="tab-group-header">
+    <div className="tab-group" {...(dragHandleProps || {})}>
+      <div 
+        className="tab-group-header" 
+        draggable={!isEditingGroupName} 
+        onClick={(e) => {
+          // Don't trigger when clicking buttons or inputs
+          if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT' && !isEditingGroupName) {
+            setExpanded(!expanded);
+          }
+        }}
+      >
         <div className="tab-group-info">
-          <h3 className="tab-group-name">{group.name}</h3>
+          {isEditingGroupName ? (
+            <form 
+              className="edit-group-name-form" 
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (groupName.trim()) {
+                  onUpdateGroup(group.id, { name: groupName.trim() });
+                  setIsEditingGroupName(false);
+                }
+              }}
+            >
+              <input 
+                type="text" 
+                className="form-control edit-group-name-input" 
+                value={groupName} 
+                onChange={(e) => setGroupName(e.target.value)}
+                autoFocus
+                onBlur={() => {
+                  if (groupName.trim()) {
+                    onUpdateGroup(group.id, { name: groupName.trim() });
+                  } else {
+                    setGroupName(group.name); // Reset to original name if empty
+                  }
+                  setIsEditingGroupName(false);
+                }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </form>
+          ) : (
+            <div className="group-name-container">
+              <h3 className="tab-group-name">
+                {group.name}
+                <button 
+                  className="btn-icon edit-icon" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsEditingGroupName(true);
+                  }} 
+                  title="Edit group name"
+                >
+                  ✎
+                </button>
+              </h3>
+            </div>
+          )}
           <div className="tab-group-meta">
             <span className="tab-group-date">{formatDate(group.created)}</span>
             <span className="tab-group-count">{group.tabCount} tab{group.tabCount !== 1 && 's'}</span>
@@ -44,7 +134,10 @@ function TabGroup({ group, onRestore, onDelete, onRestoreTab }) {
           
           <button 
             className="btn btn-sm btn-secondary"
-            onClick={() => setExpanded(!expanded)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded(!expanded);
+            }}
             title={expanded ? "Collapse" : "Expand"}
           >
             {expanded ? "Collapse" : "Expand"}
@@ -63,7 +156,15 @@ function TabGroup({ group, onRestore, onDelete, onRestoreTab }) {
       {expanded && group.tabs && (
         <div className="tab-list">
           {group.tabs.map((tab, index) => (
-            <div key={index} className="tab-item">
+            <div 
+              key={index} 
+              className={`tab-item ${draggedTabIndex === index ? 'tab-dragging' : ''} ${dragOverTabIndex === index ? 'tab-drag-over' : ''}`}
+              draggable="true"
+              onDragStart={() => handleTabDragStart(index)}
+              onDragOver={(e) => handleTabDragOver(e, index)}
+              onDrop={(e) => handleTabDrop(e, index)}
+              onDragEnd={handleTabDragEnd}
+            >
               <div className="tab-favicon">
                 {tab.favIconUrl ? (
                   <img src={tab.favIconUrl} alt="" width="16" height="16" />
@@ -73,12 +174,153 @@ function TabGroup({ group, onRestore, onDelete, onRestoreTab }) {
               </div>
               
               <div className="tab-info">
-                <div className="tab-title" title={tab.title}>
-                  {tab.title || "Untitled Tab"}
-                </div>
-                <div className="tab-url" title={tab.url}>
-                  {tab.url}
-                </div>
+                {editingTabIndex === index && editingTabField === 'title' ? (
+                  <form 
+                    className="edit-tab-form" 
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (editingTabValue.trim()) {
+                        const updatedTab = { ...tab, title: editingTabValue.trim() };
+                        onUpdateTab(group.id, index, updatedTab);
+                      }
+                      setEditingTabIndex(null);
+                      setEditingTabField(null);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <input 
+                      type="text" 
+                      className="form-control edit-tab-input" 
+                      value={editingTabValue} 
+                      onChange={(e) => setEditingTabValue(e.target.value)}
+                      autoFocus
+                      onBlur={() => {
+                        if (editingTabValue.trim()) {
+                          const updatedTab = { ...tab, title: editingTabValue.trim() };
+                          onUpdateTab(group.id, index, updatedTab);
+                        }
+                        setEditingTabIndex(null);
+                        setEditingTabField(null);
+                      }}
+                    />
+                  </form>
+                ) : (
+                  <div 
+                    className="tab-title" 
+                    title={tab.title}
+                    onClick={(e) => {
+                      if (e.target.tagName !== 'BUTTON') {
+                        e.stopPropagation();
+                        setEditingTabIndex(index);
+                        setEditingTabField('title');
+                        setEditingTabValue(tab.title || '');
+                      }
+                    }}
+                  >
+                    {tab.title || "Untitled Tab"}
+                    <button 
+                      className="btn-icon edit-icon" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingTabIndex(index);
+                        setEditingTabField('title');
+                        setEditingTabValue(tab.title || '');
+                      }} 
+                      title="Edit tab title"
+                    >
+                      ✎
+                    </button>
+                  </div>
+                )}
+
+                {editingTabIndex === index && editingTabField === 'url' ? (
+                  <form 
+                    className="edit-tab-form" 
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (editingTabValue.trim()) {
+                        try {
+                          // Basic URL validation
+                          new URL(editingTabValue);
+                          const updatedTab = { ...tab, url: editingTabValue.trim() };
+                          onUpdateTab(group.id, index, updatedTab);
+                        } catch (error) {
+                          // Add http:// prefix if missing
+                          const urlWithPrefix = `http://${editingTabValue.trim()}`;
+                          try {
+                            new URL(urlWithPrefix);
+                            const updatedTab = { ...tab, url: urlWithPrefix };
+                            onUpdateTab(group.id, index, updatedTab);
+                          } catch (e) {
+                            // Invalid URL even with prefix
+                            alert('Please enter a valid URL');
+                            return;
+                          }
+                        }
+                      }
+                      setEditingTabIndex(null);
+                      setEditingTabField(null);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <input 
+                      type="text" 
+                      className="form-control edit-tab-input" 
+                      value={editingTabValue} 
+                      onChange={(e) => setEditingTabValue(e.target.value)}
+                      autoFocus
+                      onBlur={() => {
+                        if (editingTabValue.trim()) {
+                          try {
+                            // Basic URL validation
+                            new URL(editingTabValue);
+                            const updatedTab = { ...tab, url: editingTabValue.trim() };
+                            onUpdateTab(group.id, index, updatedTab);
+                          } catch (error) {
+                            // Add http:// prefix if missing
+                            const urlWithPrefix = `http://${editingTabValue.trim()}`;
+                            try {
+                              new URL(urlWithPrefix);
+                              const updatedTab = { ...tab, url: urlWithPrefix };
+                              onUpdateTab(group.id, index, updatedTab);
+                            } catch (e) {
+                              // If still invalid, keep the original value
+                            }
+                          }
+                        }
+                        setEditingTabIndex(null);
+                        setEditingTabField(null);
+                      }}
+                    />
+                  </form>
+                ) : (
+                  <div 
+                    className="tab-url" 
+                    title={tab.url}
+                    onClick={(e) => {
+                      if (e.target.tagName !== 'BUTTON') {
+                        e.stopPropagation();
+                        setEditingTabIndex(index);
+                        setEditingTabField('url');
+                        setEditingTabValue(tab.url || '');
+                      }
+                    }}
+                  >
+                    {tab.url}
+                    <button 
+                      className="btn-icon edit-icon" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingTabIndex(index);
+                        setEditingTabField('url');
+                        setEditingTabValue(tab.url || '');
+                      }} 
+                      title="Edit tab URL"
+                    >
+                      ✎
+                    </button>
+                  </div>
+                )}
               </div>
               
               <button 
@@ -578,6 +820,8 @@ function Options() {
   const [tabGroups, setTabGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [draggedGroupIndex, setDraggedGroupIndex] = useState(null);
+  const [dragOverGroupIndex, setDragOverGroupIndex] = useState(null);
   const [settings, setSettings] = useState({
     closeTabsAfterSave: false,
     usePinProtection: false,
@@ -764,6 +1008,152 @@ function Options() {
     }
   };
   
+  // Handle updating a tab group
+  const handleUpdateGroup = async (groupId, updates) => {
+    try {
+      const groupIndex = tabGroups.findIndex(g => g.id === groupId);
+      if (groupIndex === -1) return;
+      
+      // Update local state first for immediate UI update
+      const updatedGroups = [...tabGroups];
+      updatedGroups[groupIndex] = {
+        ...updatedGroups[groupIndex],
+        ...updates
+      };
+      setTabGroups(updatedGroups);
+      
+      // Save to storage
+      await storageService.updateTabGroup(groupId, updates);
+      
+      setMessage({ type: 'success', text: 'Group updated!' });
+      setTimeout(() => setMessage(null), 2000);
+    } catch (error) {
+      console.error('Error updating group:', error);
+      setMessage({ type: 'error', text: `Error updating group: ${error.message}` });
+    }
+  };
+  
+  // Handle updating a tab
+  const handleUpdateTab = async (groupId, tabIndex, updatedTab) => {
+    try {
+      const groupIndex = tabGroups.findIndex(g => g.id === groupId);
+      if (groupIndex === -1) return;
+      
+      const group = tabGroups[groupIndex];
+      const tabs = [...group.tabs];
+      
+      // Update the tab at the specified index
+      tabs[tabIndex] = updatedTab;
+      
+      // Create updated group
+      const updatedGroup = {
+        ...group,
+        tabs
+      };
+      
+      // Update local state first for immediate UI update
+      const updatedGroups = [...tabGroups];
+      updatedGroups[groupIndex] = updatedGroup;
+      setTabGroups(updatedGroups);
+      
+      // Save to storage
+      await storageService.updateTabGroup(groupId, { tabs });
+      
+      setMessage({ type: 'success', text: 'Tab updated!' });
+      setTimeout(() => setMessage(null), 2000);
+    } catch (error) {
+      console.error('Error updating tab:', error);
+      setMessage({ type: 'error', text: `Error updating tab: ${error.message}` });
+    }
+  };
+
+  // Handle reordering tabs within a group
+  const handleReorderTabs = async (groupId, fromIndex, toIndex) => {
+    try {
+      const groupIndex = tabGroups.findIndex(g => g.id === groupId);
+      if (groupIndex === -1) return;
+      
+      const group = tabGroups[groupIndex];
+      const tabs = [...group.tabs];
+      
+      // Remove from old position and insert at new position
+      const [movedTab] = tabs.splice(fromIndex, 1);
+      tabs.splice(toIndex, 0, movedTab);
+      
+      // Create updated group
+      const updatedGroup = {
+        ...group,
+        tabs
+      };
+      
+      // Update local state first for immediate UI update
+      const updatedGroups = [...tabGroups];
+      updatedGroups[groupIndex] = updatedGroup;
+      setTabGroups(updatedGroups);
+      
+      // Save to storage
+      await storageService.updateTabGroup(groupId, { tabs });
+      
+      setMessage({ type: 'success', text: 'Tab order updated!' });
+      setTimeout(() => setMessage(null), 2000);
+    } catch (error) {
+      console.error('Error reordering tabs:', error);
+      setMessage({ type: 'error', text: `Error updating tab order: ${error.message}` });
+    }
+  };
+  
+  // Handle group drag start
+  const handleGroupDragStart = (index) => {
+    setDraggedGroupIndex(index);
+  };
+  
+  // Handle group drag over
+  const handleGroupDragOver = (e, index) => {
+    e.preventDefault();
+    if (draggedGroupIndex !== null && draggedGroupIndex !== index) {
+      setDragOverGroupIndex(index);
+    }
+  };
+  
+  // Handle group drop
+  const handleGroupDrop = async (e, index) => {
+    e.preventDefault();
+    if (draggedGroupIndex !== null && draggedGroupIndex !== index) {
+      try {
+        // Reorder groups in state
+        const updatedGroups = [...tabGroups];
+        const [movedGroup] = updatedGroups.splice(draggedGroupIndex, 1);
+        updatedGroups.splice(index, 0, movedGroup);
+        
+        // Update state first for immediate UI update
+        setTabGroups(updatedGroups);
+        
+        // Update the order of groups in storage
+        // This is a more complex operation that requires updating each group's orderIndex
+        for (let i = 0; i < updatedGroups.length; i++) {
+          await storageService.updateTabGroup(updatedGroups[i].id, { orderIndex: i });
+        }
+        
+        setMessage({ type: 'success', text: 'Group order updated!' });
+        setTimeout(() => setMessage(null), 2000);
+      } catch (error) {
+        console.error('Error reordering groups:', error);
+        setMessage({ type: 'error', text: `Error updating group order: ${error.message}` });
+        // Reload original data on error
+        await loadTabGroups();
+      } finally {
+        setDraggedGroupIndex(null);
+        setDragOverGroupIndex(null);
+      }
+    }
+  };
+  
+  // Reset group drag states
+  const handleGroupDragEnd = () => {
+    setDraggedGroupIndex(null);
+    setDragOverGroupIndex(null);
+  };
+
   // Handle import
   const handleImport = async (data) => {
     try {
@@ -866,14 +1256,27 @@ function Options() {
               </div>
             ) : (
               <div className="tab-groups-list">
-                {tabGroups.map(group => (
-                  <TabGroup 
+                {tabGroups.map((group, index) => (
+                  <div 
                     key={group.id}
-                    group={group}
-                    onRestore={handleRestoreGroup}
-                    onDelete={handleDeleteGroup}
-                    onRestoreTab={handleRestoreTab}
-                  />
+                    className={`group-container ${draggedGroupIndex === index ? 'group-dragging' : ''} ${dragOverGroupIndex === index ? 'group-drag-over' : ''}`}
+                    draggable="true"
+                    onDragStart={() => handleGroupDragStart(index)}
+                    onDragOver={(e) => handleGroupDragOver(e, index)}
+                    onDrop={(e) => handleGroupDrop(e, index)}
+                    onDragEnd={handleGroupDragEnd}
+                  >
+                    <TabGroup 
+                      key={group.id}
+                      group={group}
+                      onRestore={handleRestoreGroup}
+                      onDelete={handleDeleteGroup}
+                      onRestoreTab={handleRestoreTab}
+                      onReorderTabs={handleReorderTabs}
+                      onUpdateGroup={handleUpdateGroup}
+                      onUpdateTab={handleUpdateTab}
+                    />
+                  </div>
                 ))}
               </div>
             )}

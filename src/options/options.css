@@ -1,4 +1,31 @@
 /* Options Page Styles */
+
+/* SVG Icon Styles */
+svg {
+  vertical-align: -0.125em;
+  display: inline-block;
+}
+
+.btn svg {
+  margin-right: 6px;
+  width: 1em;
+  height: 1em;
+}
+
+.icon-only svg {
+  margin-right: 0;
+}
+
+.icon-lg svg {
+  width: 1.5em;
+  height: 1.5em;
+}
+
+.icon-sm svg {
+  width: 0.875em;
+  height: 0.875em;
+}
+
 :root {
   --primary-color: #2c6bed;
   --primary-dark: #1d5ad9;
@@ -46,9 +73,18 @@ body {
   transition: all 0.2s ease;
   cursor: pointer;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: 120px;
+  gap: 12px;
+}
+
+.drag-drop-area .lucide {
+  width: 2.5em;
+  height: 2.5em;
+  stroke: var(--gray-500);
+  transition: all 0.2s ease;
 }
 
 .drag-drop-area p {
@@ -78,6 +114,13 @@ body {
   gap: 12px;
   margin-top: 16px;
   flex-wrap: wrap;
+}
+
+.export-buttons .btn,
+.import-buttons .btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Import old toast animations for compatibility */
@@ -408,6 +451,9 @@ body {
 }
 
 .export-options-buttons button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex: 1;
   padding: 10px;
   border: none;

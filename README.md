@@ -1,114 +1,73 @@
 # TabLocker
 
-![icon](https://raw.githubusercontent.com/FlamingKeyboard/TabLocker/refs/heads/main/icons/default-favicon.svg)
-
-A privacy-focused browser extension for securely saving and restoring browser tabs with local encryption.
+A secure, privacy-focused browser extension for saving and managing tabs with local encryption and compression.
 
 ## Features
 
-- **Secure Tab Management**: Save and restore your tabs with local encryption
-- **Privacy-Focused**: All data is stored locally, nothing is sent to any server
-- **Memory Savings**: Free up browser memory by saving tabs you're not using right now
-- **Drag and Drop**: Easily reorder tabs within and between sessions
-- **Full Dashboard**: Access a dedicated dashboard page for better tab management
-- **Export/Import**: Share your saved tabs between devices or create backups
-- **Search**: Quickly find tabs across all your saved sessions
-- **Star Sessions**: Mark important sessions for quick access
+- **One-click Tab Saving**: Save all open tabs or just selected ones
+- **Tab Restoration**: Restore tabs individually or all at once
+- **Local Encryption**: AES-256-GCM encryption via Web Crypto API
+- **Data Compression**: Local data compression before encryption
+- **Private by Design**: 100% local storage with no cloud connectivity
+- **Import/Export**: Export your tabs as encrypted files or OneTab-compatible format
+- **Basic Search**: Find your saved tabs by title or URL
+- **Cross-Browser Support**: Works on Chrome, Firefox, Edge, and Opera
 
-## Technical Details
+## Privacy & Security
 
-### Security
-
-TabLocker uses the Web Crypto API to implement AES-256-GCM encryption for all saved tab data. The encryption key is generated when the extension is first installed and stored securely in local storage.
-
-### Data Storage
-
-All data is stored locally using the browser's storage API. No data is sent to any external servers.
-
-### Compression
-
-TabLocker uses LZString to compress tab data before encryption, reducing storage requirements and enabling more efficient export/import.
-
-### UI Framework
-
-The user interface is built using Preact, a lightweight alternative to React, providing a fast and responsive experience.
+TabLocker is designed with privacy as a top priority:
+- All tab data is stored locally on your device
+- AES-256-GCM encryption for all saved data
+- Optional PIN protection
+- No data sent to any server
+- No analytics or tracking
+- Open source code for transparency
 
 ## Installation
 
-### Development Mode
+### From Web Stores
+*Coming soon*
 
-1. Clone this repository:
-   ```
-   git clone https://github.com/yourusername/tablocker.git
-   ```
-
-2. Install dependencies:
-   ```
-   npm install
-   ```
-
-3. Build the extension:
-   ```
-   npm run build
-   ```
-
-4. Load the extension in your browser:
-   - **Chrome/Edge/Opera**: Go to `chrome://extensions/`, enable "Developer mode", click "Load unpacked", and select the `dist` folder.
-   - **Firefox**: Go to `about:debugging#/runtime/this-firefox`, click "Load Temporary Add-on", and select any file in the `dist` folder.
-
-## Usage
-
-1. Click the TabLocker icon in your browser toolbar
-2. Use "Save All Tabs" to save your current tabs
-3. View and manage your saved sessions directly in the main view
-4. Search through your saved tabs using the search box
-5. Star important sessions to keep them at the top of the list
-6. Drag and drop tabs to reorder them within or between sessions
-7. Export sessions as encrypted files or copy URLs to clipboard
-8. Import previously exported sessions
+### Manual Installation (Developer Mode)
+1. Clone this repository
+2. Run `npm install` to install dependencies
+3. Run `npm run build` to build the extension
+4. Load the extension:
+   - **Chrome/Edge/Opera**: Go to extensions page, enable developer mode, click "Load unpacked", and select the `dist` folder
+   - **Firefox**: Go to `about:debugging`, click "This Firefox", click "Load Temporary Add-on", and select any file in the `dist` folder
 
 ## Development
 
 ### Prerequisites
-
-- Node.js and npm
+- Node.js (v14 or higher)
+- npm (v7 or higher)
 
 ### Setup
+```bash
+# Clone the repository
+git clone https://github.com/your-username/tablocker.git
+cd tablocker
 
-1. Clone the repository
-2. Install dependencies: `npm install`
-3. Build the extension: `npm run build`
+# Install dependencies
+npm install
 
-### Development Commands
+# Start development server
+npm run dev
 
-- `npm run build`: Build the extension
-- `npm run watch`: Watch for changes and rebuild automatically
-- `npm test`: Run the Jest test suite
-
-### Project Structure
-
-- `src/`: Source code
-  - `background.js`: Background service worker for handling tab operations and encryption
-  - `popup.js`: Preact-based UI for the extension popup
-  - `dragdrop.js`: Drag and drop functionality for tab reordering
-  - `styles.css`: Styling for the UI
-- `icons/`: Extension icons
-- `manifest.json`: Extension manifest file
-- `webpack.config.js`: Webpack configuration
-- `__tests__/`: Test files
-  - `background.test.js`: Tests for background script functionality
-  - `popup.test.js`: Tests for UI interactions
-
-## Future Enhancements
-
-- QR code export/import for small datasets
-- PIN-based unlocking for additional security
-- Higher compression ratio using LZMA for QR code exports
-- Advanced tab grouping and organization features
-- Keyboard shortcuts for common operations
-- Dark mode support
-- Customizable UI themes
+# Build for production
+npm run build
+```
 
 ## License
 
-This project is licensed under the GPL-3.0 License.
+This project is licensed under the GPL License - see the [LICENSE](LICENSE) file for details.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request

@@ -6,7 +6,7 @@
  */
 
 import { h, render } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import StorageService from '../services/StorageService';
 import ExportImportService from '../services/ExportImportService';
 import TabService from '../services/TabService';
@@ -127,16 +127,40 @@ function ExportImport({ onImport }) {
   const [importPassword, setImportPassword] = useState('');
   const [importText, setImportText] = useState('');
   const [message, setMessage] = useState(null);
+  const [toast, setToast] = useState(null);
   const exportImportService = new ExportImportService();
   const storageService = new StorageService();
+  const fileInputRef = useRef(null);
   
+  const showToast = (message, actions) => {
+    setToast({ message, actions });
+    // Auto-hide toast after 10 seconds if it's just a message without actions
+    if (!actions) {
+      setTimeout(() => {
+        hideToast();
+      }, 10000);
+    }
+  };
+
+  const hideToast = () => {
+    const toastElement = document.querySelector('.toast');
+    if (toastElement) {
+      toastElement.classList.add('hiding');
+      setTimeout(() => {
+        setToast(null);
+      }, 300);
+    } else {
+      setToast(null);
+    }
+  };
+
   const handleExport = async (format) => {
     try {
       // Get all tab groups
       const groups = await storageService.getAllTabGroups();
       
       if (groups.length === 0) {
-        setMessage({ type: 'warning', text: 'No tab groups to export' });
+        showToast('No tab groups to export');
         return;
       }
       
@@ -179,21 +203,42 @@ function ExportImport({ onImport }) {
         filename = `tablocker-encrypted-${Date.now()}.tlbk`;
       }
       
-      // Download the export file
-      if (exportData) {
-        exportImportService.downloadAsFile(exportData, filename);
-        setMessage({ type: 'success', text: 'Export successful!' });
+      // Return early if no export data
+      if (!exportData) {
+        return;
       }
+
+      showToast('Choose how to export your tabs:', [
+        {
+          label: 'Save to File',
+          onClick: () => {
+            exportImportService.downloadAsFile(exportData, filename);
+            showToast('Export saved to file successfully!');
+          },
+          primary: true
+        },
+        {
+          label: 'Copy to Clipboard',
+          onClick: async () => {
+            const copySuccess = await exportImportService.copyToClipboard(exportData);
+            if (copySuccess) {
+              showToast('Export copied to clipboard!');
+            } else {
+              showToast('Failed to copy to clipboard');
+            }
+          }
+        }
+      ]);
     } catch (error) {
       console.error('Export error:', error);
-      setMessage({ type: 'error', text: `Export failed: ${error.message}` });
+      showToast(`Export failed: ${error.message}`);
     }
   };
   
   const handleImport = async () => {
     try {
       if (!importText.trim()) {
-        setMessage({ type: 'warning', text: 'Please enter import data' });
+        showToast('Please enter import data');
         return;
       }
       
@@ -205,11 +250,11 @@ function ExportImport({ onImport }) {
       
       if (result.type === 'tablocker') {
         // Handle TabLocker format import
-        setMessage({ type: 'success', text: 'TabLocker import successful!' });
+        showToast('TabLocker import successful!');
         onImport(result.data);
       } else if (result.type === 'onetab') {
         // Handle OneTab format import
-        setMessage({ type: 'success', text: 'OneTab import successful!' });
+        showToast('OneTab import successful!');
         onImport(result.data);
       }
       
@@ -218,12 +263,97 @@ function ExportImport({ onImport }) {
       setImportPassword('');
     } catch (error) {
       console.error('Import error:', error);
-      setMessage({ type: 'error', text: `Import failed: ${error.message}` });
+      showToast(`Import failed: ${error.message}`);
+    }
+  };
+
+  // Handle file import
+  const handleFileImport = async (event) => {
+    try {
+      const file = event.target.files[0];
+      if (!file) {
+        return;
+      }
+
+      const reader = new FileReader();
+      
+      reader.onload = async (e) => {
+        try {
+          const fileContent = e.target.result;
+          setImportText(fileContent);
+          
+          // Auto-import if we have content
+          if (fileContent) {
+            if (importPassword) {
+              exportImportService.setPassword(importPassword);
+            }
+            
+            const result = await exportImportService.autoImport(fileContent, importPassword);
+            
+            if (result.type === 'tablocker') {
+              showToast('TabLocker import successful!');
+              onImport(result.data);
+            } else if (result.type === 'onetab') {
+              showToast('OneTab import successful!');
+              onImport(result.data);
+            }
+            
+            // Clear the import form
+            setImportText('');
+            setImportPassword('');
+          }
+        } catch (error) {
+          console.error('File import error:', error);
+          showToast(`File import failed: ${error.message}`);
+        }
+      };
+      
+      reader.onerror = () => {
+        showToast('Error reading file');
+      };
+      
+      reader.readAsText(file);
+      
+      // Reset the file input so the same file can be selected again
+      event.target.value = '';
+    } catch (error) {
+      console.error('File import error:', error);
+      showToast(`File import failed: ${error.message}`);
+    }
+  };
+  
+  // Trigger file input click
+  const triggerFileInput = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
     }
   };
   
   return (
     <div className="export-import-container">
+      {/* Toast notification */}
+      {toast && (
+        <div className="toast">
+          <div className="toast-message">{toast.message}</div>
+          {toast.actions && (
+            <div className="toast-actions">
+              {toast.actions.map((action, index) => (
+                <button
+                  key={index}
+                  className={`btn ${action.primary ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => {
+                    action.onClick();
+                    hideToast();
+                  }}
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      
       <div className="card">
         <div className="card-header">
           <h3>Export Tabs</h3>
@@ -245,12 +375,14 @@ function ExportImport({ onImport }) {
             <button 
               className="btn btn-primary" 
               onClick={() => handleExport('encrypted')}
+              title="Export as encrypted TabLocker format (download or copy)"
             >
               Export Encrypted
             </button>
             <button 
               className="btn btn-secondary" 
               onClick={() => handleExport('onetab')}
+              title="Export in OneTab compatible format (download or copy)"
             >
               Export OneTab Compatible
             </button>
@@ -287,20 +419,31 @@ function ExportImport({ onImport }) {
             />
           </div>
           
-          <button 
-            className="btn btn-primary" 
-            onClick={handleImport}
-          >
-            Import
-          </button>
+          <div className="import-buttons">
+            <button 
+              className="btn btn-primary" 
+              onClick={handleImport}
+              title="Import from pasted text"
+            >
+              Import
+            </button>
+            <button 
+              className="btn btn-secondary" 
+              onClick={triggerFileInput}
+              title="Import from file"
+            >
+              Import from File
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".txt,.tlbk,text/plain"
+              onChange={handleFileImport}
+              style={{ display: 'none' }}
+            />
+          </div>
         </div>
       </div>
-      
-      {message && (
-        <div className={`message message-${message.type}`}>
-          {message.text}
-        </div>
-      )}
     </div>
   );
 }

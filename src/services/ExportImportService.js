@@ -52,7 +52,7 @@ class ExportImportService {
       return '';
     }
 
-    // OneTab format is simply "URL | Title" for each tab, one per line
+    // OneTab format is "URL | Title" for each tab, one per line
     return tabs.map(tab => `${tab.url} | ${tab.title || ''}`).join('\n');
   }
 
@@ -66,16 +66,21 @@ class ExportImportService {
       return [];
     }
 
-    // Split by lines and parse each line
-    const lines = text.split('\n').filter(line => line.trim() !== '');
+    // Split into groups by double newlines
+    const groups = text.split(/\n\s*\n/).filter(group => group.trim() !== '');
     
-    return lines.map(line => {
-      // OneTab format is "URL | Title"
-      const parts = line.split('|');
-      const url = parts[0].trim();
-      const title = parts.length > 1 ? parts.slice(1).join('|').trim() : '';
+    return groups.map(groupText => {
+      // Split group into lines and parse each line
+      const lines = groupText.split('\n').filter(line => line.trim() !== '');
       
-      return { url, title };
+      return lines.map(line => {
+        // OneTab format is "URL | Title"
+        const parts = line.split('|');
+        const url = parts[0].trim();
+        const title = parts.length > 1 ? parts.slice(1).join('|').trim() : url;
+        
+        return { url, title };
+      });
     });
   }
 
@@ -192,21 +197,30 @@ class ExportImportService {
       return false;
     }
     
-    // Check a few lines to see if they match OneTab format
-    const lines = text.split('\n').filter(line => line.trim() !== '');
+    // Split into groups by double newlines
+    const groups = text.split(/\n\s*\n/).filter(group => group.trim() !== '');
     
-    if (lines.length === 0) {
+    if (groups.length === 0) {
       return false;
     }
     
-    // OneTab format should have at least some lines with "http" and a pipe symbol
-    const validLines = lines.filter(line => 
-      (line.includes('http://') || line.includes('https://')) && 
-      line.includes('|')
-    );
+    // Check each group
+    let totalLines = 0;
+    let validLines = 0;
     
-    // If at least 80% of non-empty lines are valid, consider it OneTab format
-    return validLines.length / lines.length >= 0.8;
+    for (const group of groups) {
+      const lines = group.split('\n').filter(line => line.trim() !== '');
+      totalLines += lines.length;
+      
+      // Count valid lines (has URL and optional title)
+      validLines += lines.filter(line => {
+        const trimmed = line.trim();
+        return (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('edge://'));
+      }).length;
+    }
+    
+    // If at least 80% of non-empty lines are valid URLs, consider it OneTab format
+    return totalLines > 0 && validLines / totalLines >= 0.8;
   }
 
   /**
@@ -229,22 +243,62 @@ class ExportImportService {
       throw new Error('No import data provided');
     }
     
+    // Try TabLocker format first
     if (this.isTabLockerFormat(text)) {
       return {
         type: 'tablocker',
         data: await this.importEncrypted(text, password)
       };
-    } else if (this.isOneTabFormat(text)) {
+    }
+
+    // Handle single URL or title|URL format
+    const lines = text.trim().split('\n');
+    if (lines.length === 1) {
+      const line = lines[0].trim();
+      let url, title;
+
+      // Check if it's a URL|title format (OneTab format)
+      if (line.includes(' | ')) {
+        [url, title] = line.split(' | ').map(s => s.trim());
+      } else {
+        // Treat as direct URL
+        url = line;
+        title = line;
+      }
+
+      // Validate URL format
+      if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('edge://')) {
+        return {
+          type: 'onetab',
+          data: {
+            groups: [{
+              id: Date.now().toString(),
+              name: 'Imported URL',
+              created: Date.now(),
+              tabs: [{ url, title }]
+            }]
+          }
+        };
+      }
+    }
+
+    // Try OneTab format
+    if (this.isOneTabFormat(text)) {
+      const tabGroups = this.importFromOneTabFormat(text);
       return {
         type: 'onetab',
         data: {
-          tabs: this.importFromOneTabFormat(text),
-          name: `Imported from OneTab ${new Date().toLocaleString()}`
+          groups: tabGroups.map((tabs, index) => ({
+            id: (Date.now() + index).toString(),
+            name: `Imported Group ${index + 1}`,
+            created: Date.now(),
+            tabs
+          }))
         }
       };
-    } else {
-      throw new Error('Unsupported import format');
     }
+
+    throw new Error('Unsupported import format');
   }
 
   /**
@@ -273,6 +327,43 @@ class ExportImportService {
     } catch (error) {
       console.error('Error creating download:', error);
       throw new Error('Cannot download file in this context');
+    }
+  }
+
+  /**
+   * Copy data to clipboard
+   * @param {string} data - Data to copy to clipboard
+   * @returns {Promise<boolean>} - Whether the copy was successful
+   */
+  async copyToClipboard(data) {
+    try {
+      await navigator.clipboard.writeText(data);
+      return true;
+    } catch (error) {
+      console.error('Error copying to clipboard:', error);
+      
+      // Fallback method if the Clipboard API fails
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = data;
+        
+        // Make the textarea out of viewport
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        return successful;
+      } catch (fallbackError) {
+        console.error('Fallback clipboard copy failed:', fallbackError);
+        return false;
+      }
     }
   }
 }

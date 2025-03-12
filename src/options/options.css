@@ -213,14 +213,38 @@ body {
 }
 
 .btn-link {
+  font-weight: 400;
   color: var(--primary-color);
   background-color: transparent;
-  border-color: transparent;
+  border: none;
 }
 
 .btn-link:hover:not(:disabled) {
   color: var(--primary-dark);
   text-decoration: underline;
+}
+
+/* Export/Import buttons container */
+.export-buttons,
+.import-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+/* Make sure buttons have consistent width */
+.export-buttons .btn,
+.import-buttons .btn {
+  flex: 1;
+  min-width: 120px;
+}
+
+/* Add responsive styles for small screens */
+@media (max-width: 480px) {
+  .export-buttons,
+  .import-buttons {
+    flex-direction: column;
+  }
 }
 
 /* Card styles */
@@ -456,4 +480,64 @@ small {
 .settings-container {
   max-width: 600px;
   margin: 0 auto;
+}
+
+/* Toast notification styles */
+.toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  padding: 16px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 300px;
+  max-width: 400px;
+  animation: slideIn 0.3s ease-out;
+}
+
+.toast-message {
+  margin-bottom: 8px;
+  color: var(--gray-800);
+}
+
+.toast-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.toast-actions .btn {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.toast.hiding {
+  animation: slideOut 0.3s ease-in forwards;
 }

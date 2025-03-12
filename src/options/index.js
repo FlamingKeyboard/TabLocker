@@ -1016,42 +1016,80 @@ function Options() {
   // Load tab groups from storage
   async function loadTabGroups() {
     try {
+      console.log('loadTabGroups called, searchQuery:', searchQuery);
       let groups;
       
       if (searchQuery) {
+        console.log('Calling searchTabGroups with query:', searchQuery);
         groups = await storageService.searchTabGroups(searchQuery);
+        console.log('Search returned', groups.length, 'results');
       } else {
+        console.log('Getting all tab groups');
         groups = await storageService.getAllTabGroups();
       }
       
-      // Load full data for each group
-      const fullGroups = [];
-      let needsOrderUpdate = false;
+      console.log('Processing search results...');
       
-      for (let i = 0; i < groups.length; i++) {
-        try {
-          const group = groups[i];
-          const fullGroup = await storageService.getTabGroup(group.id);
-          
-          // Check if orderIndex needs to be initialized
-          if (fullGroup && fullGroup.orderIndex === undefined) {
-            fullGroup.orderIndex = i;
-            needsOrderUpdate = true;
-            // Update in background without waiting
-            storageService.updateTabGroup(fullGroup.id, { orderIndex: i })
-              .catch(err => console.error(`Error setting initial orderIndex for group ${fullGroup.id}:`, err));
+      // If this is a search result, we need a different approach
+      if (searchQuery) {
+        console.log('Search mode: Will display results directly without reloading full data');
+        
+        // For search results, we'll use the metadata we already have
+        // and add tab counts where available
+        const searchResultGroups = [];
+        
+        for (let i = 0; i < groups.length; i++) {
+          try {
+            const group = groups[i];
+            // Add debugging information to track which search terms matched
+            console.log(`Including search result ${i+1}/${groups.length}: Group ID ${group.id}, Name: ${group.name}`);
+            
+            // For search results, we only need minimal processing
+            // The full details are already loaded by searchTabGroups
+            searchResultGroups.push({
+              ...group,
+              tabCount: group.tabCount || 0, // Use existing count or default to 0
+              _searchMatch: true // Mark as a search match for debugging
+            });
+          } catch (error) {
+            console.error(`Error processing search result ${groups[i]?.id}:`, error);
           }
-          
-          if (fullGroup) {
-            fullGroup.tabCount = fullGroup.tabs ? fullGroup.tabs.length : 0;
-            fullGroups.push(fullGroup);
-          }
-        } catch (error) {
-          console.error(`Error loading group ${group.id}:`, error);
         }
+        
+        console.log(`Setting tab groups with ${searchResultGroups.length} search results`);
+        setTabGroups(searchResultGroups);
+      } else {
+        // Normal loading (not search)
+        console.log('Normal mode: Loading full data for each group');
+        const fullGroups = [];
+        let needsOrderUpdate = false;
+        
+        for (let i = 0; i < groups.length; i++) {
+          try {
+            const group = groups[i];
+            const fullGroup = await storageService.getTabGroup(group.id);
+            
+            // Check if orderIndex needs to be initialized
+            if (fullGroup && fullGroup.orderIndex === undefined) {
+              fullGroup.orderIndex = i;
+              needsOrderUpdate = true;
+              // Update in background without waiting
+              storageService.updateTabGroup(fullGroup.id, { orderIndex: i })
+                .catch(err => console.error(`Error setting initial orderIndex for group ${fullGroup.id}:`, err));
+            }
+            
+            if (fullGroup) {
+              fullGroup.tabCount = fullGroup.tabs ? fullGroup.tabs.length : 0;
+              fullGroups.push(fullGroup);
+            }
+          } catch (error) {
+            console.error(`Error loading group ${group.id}:`, error);
+          }
+        }
+        
+        console.log(`Setting tab groups with ${fullGroups.length} groups from normal load`);
+        setTabGroups(fullGroups);
       }
-      
-      setTabGroups(fullGroups);
     } catch (error) {
       console.error('Error loading tab groups:', error);
       throw error;
@@ -1074,6 +1112,7 @@ function Options() {
   
   // Handle search
   const handleSearch = (query) => {
+    console.log('handleSearch called with query:', query);
     setSearchQuery(query);
     setLoading(true);
     

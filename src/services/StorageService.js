@@ -314,54 +314,150 @@ class StorageService {
   /**
    * Search tab groups
    * @param {string} query - Search query
-   * @returns {Promise<Array>} - Array of matching tab groups
+   * @returns {Promise<Array>} - Array of matching tab groups with tab counts
    */
   async searchTabGroups(query) {
+    console.log('=== SEARCH DEBUG START ===');
+    console.log(`Raw search query: "${query}"`);
+    
     if (!query || query.trim() === '') {
+      console.log('Empty query - returning all tab groups');
       return this.getAllTabGroups();
     }
     
     const allTabGroups = await this.getAllTabGroups();
-    const lowerQuery = query.toLowerCase();
+    console.log(`Total groups to search: ${allTabGroups.length}`);
+    
+    // Log structure of first group as sample (if available)
+    if (allTabGroups.length > 0) {
+      console.log('Sample group structure:', JSON.stringify(allTabGroups[0], null, 2));
+    }
+    
+    const lowerQuery = query.toLowerCase().trim();
+    console.log(`Normalized search query: "${lowerQuery}"`);
     
     // First search in metadata (which doesn't require decryption)
-    const metadataMatches = allTabGroups.filter(group => 
-      group.name.toLowerCase().includes(lowerQuery)
-    );
+    const metadataMatches = [];
+    
+    for (const group of allTabGroups) {
+      let isMatch = false;
+      let matchReason = '';
+      
+      // Check group name
+      if (group.name && group.name.toLowerCase().includes(lowerQuery)) {
+        isMatch = true;
+        matchReason = `Group name match: "${group.name}" contains "${lowerQuery}"`;
+      }
+      
+      // Check date/time (formatted as string)
+      if (!isMatch && group.created) {
+        const dateStr = new Date(group.created).toLocaleString().toLowerCase();
+        console.log(`Group ${group.id} date string: "${dateStr}"`);
+        if (dateStr.includes(lowerQuery)) {
+          isMatch = true;
+          matchReason = `Date/time match: "${dateStr}" contains "${lowerQuery}"`;
+        }
+      }
+
+      if (isMatch) {
+        metadataMatches.push({
+          ...group,
+          tabCount: group.tabCount || 0, // Include tab count for UI
+          _matchReason: matchReason     // For debugging
+        });
+        console.log(`✓ Metadata match for group ${group.id}: ${matchReason}`);
+      } else {
+        console.log(`✗ No metadata match for group ${group.id}`);
+      }
+    }
+    
+    console.log(`Metadata matches found: ${metadataMatches.length}`);
     
     // Get the IDs of groups that didn't match by metadata
     const idsToSearch = allTabGroups
       .filter(group => !metadataMatches.some(match => match.id === group.id))
       .map(group => group.id);
     
+    console.log(`Groups to search in tab content: ${idsToSearch.length}`);
+    
     // Search inside the encrypted tabs content
     const contentMatches = [];
     
     for (const id of idsToSearch) {
       try {
+        console.log(`Searching inside tab content for group ${id}...`);
         const group = await this.getTabGroup(id);
         
-        if (!group || !group.tabs) continue;
+        if (!group) {
+          console.log(`Group ${id} not found`);
+          continue;
+        }
+        
+        if (!group.tabs) {
+          console.log(`Group ${id} has no tabs array`);
+          continue;
+        }
+        
+        console.log(`Group ${id} has ${group.tabs.length} tabs to search`);
+        const tabCount = group.tabs.length; // Store tab count for UI display
         
         // Check if any tab title or URL matches the query
-        const hasMatch = group.tabs.some(tab => 
-          (tab.title && tab.title.toLowerCase().includes(lowerQuery)) || 
-          (tab.url && tab.url.toLowerCase().includes(lowerQuery))
-        );
+        let foundMatch = false;
+        let matchReason = '';
         
-        if (hasMatch) {
-          // Don't include decrypted tabs in the search results
-          const matchGroup = { ...group };
-          delete matchGroup.tabs;
-          delete matchGroup.encryptedTabs;
+        for (let i = 0; i < group.tabs.length; i++) {
+          const tab = group.tabs[i];
+          
+          // Check tab title
+          if (tab.title && tab.title.toLowerCase().includes(lowerQuery)) {
+            foundMatch = true;
+            matchReason = `Tab ${i} title match: "${tab.title}" contains "${lowerQuery}"`;
+            break;
+          }
+          
+          // Check tab URL
+          if (tab.url && tab.url.toLowerCase().includes(lowerQuery)) {
+            foundMatch = true;
+            matchReason = `Tab ${i} URL match: "${tab.url}" contains "${lowerQuery}"`;
+            break;
+          }
+
+          // Check tab saved date/time if available
+          if (tab.savedAt) {
+            const tabDateStr = new Date(tab.savedAt).toLocaleString().toLowerCase();
+            console.log(`Tab ${i} date string: "${tabDateStr}"`);
+            if (tabDateStr.includes(lowerQuery)) {
+              foundMatch = true;
+              matchReason = `Tab ${i} date match: "${tabDateStr}" contains "${lowerQuery}"`;
+              break;
+            }
+          }
+        }
+        
+        if (foundMatch) {
+          // Create a result with just the metadata we need (not the full tabs data)
+          // We need to construct a new object with just what's needed for display
+          const matchGroup = {
+            id: group.id,
+            name: group.name,
+            created: group.created,
+            orderIndex: group.orderIndex,
+            tabCount: tabCount,
+            _matchReason: matchReason // For debugging
+          };
           
           contentMatches.push(matchGroup);
+          console.log(`✓ Content match for group ${id}: ${matchReason}`);
+        } else {
+          console.log(`✗ No content match for group ${id}`);
         }
       } catch (error) {
-        console.error('Error searching tab group:', error);
+        console.error(`Error searching tab group ${id}:`, error);
         // Continue to next group if there's an error
       }
     }
+    
+    console.log(`Content matches found: ${contentMatches.length}`);
     
     // Combine and deduplicate results
     const allMatches = [...metadataMatches];
@@ -371,6 +467,10 @@ class StorageService {
         allMatches.push(match);
       }
     }
+    
+    console.log(`Total matches after deduplication: ${allMatches.length}`);
+    console.log('Search results:', allMatches);
+    console.log('=== SEARCH DEBUG END ===');
     
     return allMatches;
   }

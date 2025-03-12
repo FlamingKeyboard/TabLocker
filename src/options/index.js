@@ -23,6 +23,16 @@ function TabGroup({ group, onRestore, onDelete, onRestoreTab, onReorderTabs, onU
   const [editingTabField, setEditingTabField] = useState(null); // 'title' or 'url'
   const [editingTabValue, setEditingTabValue] = useState('');
   
+  // Add isEditing flag to the group object to track if any editing is happening
+  // This will be used by parent component to disable dragging of all groups when any group is being edited
+  useEffect(() => {
+    if (isEditingGroupName || editingTabIndex !== null) {
+      onUpdateGroup(group.id, { isEditing: true }, false); // false = don't persist this flag to storage
+    } else {
+      onUpdateGroup(group.id, { isEditing: false }, false);
+    }
+  }, [isEditingGroupName, editingTabIndex]);
+  
   // Format date from timestamp
   const formatDate = (timestamp) => {
     if (!timestamp) return '';
@@ -31,6 +41,10 @@ function TabGroup({ group, onRestore, onDelete, onRestoreTab, onReorderTabs, onU
   
   // Handle tab drag start
   const handleTabDragStart = (index) => {
+    // Prevent drag start if any editing is happening
+    if (isEditingGroupName || editingTabIndex !== null) {
+      return;
+    }
     setDraggedTabIndex(index);
   };
 
@@ -159,7 +173,7 @@ function TabGroup({ group, onRestore, onDelete, onRestoreTab, onReorderTabs, onU
             <div 
               key={index} 
               className={`tab-item ${draggedTabIndex === index ? 'tab-dragging' : ''} ${dragOverTabIndex === index ? 'tab-drag-over' : ''}`}
-              draggable="true"
+              draggable={editingTabIndex === null}
               onDragStart={() => handleTabDragStart(index)}
               onDragOver={(e) => handleTabDragOver(e, index)}
               onDrop={(e) => handleTabDrop(e, index)}
@@ -1009,7 +1023,7 @@ function Options() {
   };
   
   // Handle updating a tab group
-  const handleUpdateGroup = async (groupId, updates) => {
+  const handleUpdateGroup = async (groupId, updates, persist = true) => {
     try {
       const groupIndex = tabGroups.findIndex(g => g.id === groupId);
       if (groupIndex === -1) return;
@@ -1022,8 +1036,10 @@ function Options() {
       };
       setTabGroups(updatedGroups);
       
-      // Save to storage
-      await storageService.updateTabGroup(groupId, updates);
+      // Save to storage (unless persist is false)
+      if (persist) {
+        await storageService.updateTabGroup(groupId, updates);
+      }
       
       setMessage({ type: 'success', text: 'Group updated!' });
       setTimeout(() => setMessage(null), 2000);
@@ -1104,6 +1120,10 @@ function Options() {
   
   // Handle group drag start
   const handleGroupDragStart = (index) => {
+    // Don't allow dragging if any group is being edited
+    if (tabGroups.some(g => g.isEditing)) {
+      return;
+    }
     setDraggedGroupIndex(index);
   };
   
@@ -1260,7 +1280,7 @@ function Options() {
                   <div 
                     key={group.id}
                     className={`group-container ${draggedGroupIndex === index ? 'group-dragging' : ''} ${dragOverGroupIndex === index ? 'group-drag-over' : ''}`}
-                    draggable="true"
+                    draggable={tabGroups.every(g => !g.isEditing)}
                     onDragStart={() => handleGroupDragStart(index)}
                     onDragOver={(e) => handleGroupDragOver(e, index)}
                     onDrop={(e) => handleGroupDrop(e, index)}

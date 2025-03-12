@@ -878,10 +878,21 @@ function Options() {
       
       // Load full data for each group
       const fullGroups = [];
+      let needsOrderUpdate = false;
       
-      for (const group of groups) {
+      for (let i = 0; i < groups.length; i++) {
         try {
+          const group = groups[i];
           const fullGroup = await storageService.getTabGroup(group.id);
+          
+          // Check if orderIndex needs to be initialized
+          if (fullGroup && fullGroup.orderIndex === undefined) {
+            fullGroup.orderIndex = i;
+            needsOrderUpdate = true;
+            // Update in background without waiting
+            storageService.updateTabGroup(fullGroup.id, { orderIndex: i })
+              .catch(err => console.error(`Error setting initial orderIndex for group ${fullGroup.id}:`, err));
+          }
           
           if (fullGroup) {
             fullGroup.tabCount = fullGroup.tabs ? fullGroup.tabs.length : 0;
@@ -1149,10 +1160,18 @@ function Options() {
         setTabGroups(updatedGroups);
         
         // Update the order of groups in storage
-        // This is a more complex operation that requires updating each group's orderIndex
+        const updatePromises = [];
+        
+        // Update orderIndex for each group
         for (let i = 0; i < updatedGroups.length; i++) {
-          await storageService.updateTabGroup(updatedGroups[i].id, { orderIndex: i });
+          // Add order updates to a batch of promises
+          updatePromises.push(
+            storageService.updateTabGroup(updatedGroups[i].id, { orderIndex: i })
+          );
         }
+        
+        // Wait for all updates to complete
+        await Promise.all(updatePromises);
         
         setMessage({ type: 'success', text: 'Group order updated!' });
         setTimeout(() => setMessage(null), 2000);

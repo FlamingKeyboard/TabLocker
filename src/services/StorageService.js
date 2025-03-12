@@ -48,6 +48,7 @@ class StorageService {
           const tabGroupsStore = db.createObjectStore('tabGroups', { keyPath: 'id' });
           tabGroupsStore.createIndex('created', 'created', { unique: false });
           tabGroupsStore.createIndex('name', 'name', { unique: false });
+          tabGroupsStore.createIndex('orderIndex', 'orderIndex', { unique: false });
         }
         
         if (!db.objectStoreNames.contains('settings')) {
@@ -242,7 +243,7 @@ class StorageService {
       
       const transaction = this.db.transaction('tabGroups', 'readonly');
       const store = transaction.objectStore('tabGroups');
-      const request = store.index('created').openCursor(null, 'prev'); // Newest first
+      const request = store.index('created').openCursor(null, 'prev'); // Initially get by created date
       
       const tabGroups = [];
       
@@ -256,7 +257,20 @@ class StorageService {
           tabGroups.push(tabGroup);
           cursor.continue();
         } else {
-          resolve(tabGroups);
+          // Sort by orderIndex if available, otherwise keep created date sort
+          const sortedGroups = tabGroups.sort((a, b) => {
+            // If both have orderIndex, sort by that
+            if (a.orderIndex !== undefined && b.orderIndex !== undefined) {
+              return a.orderIndex - b.orderIndex;
+            }
+            // If only one has orderIndex, prioritize the one with orderIndex
+            if (a.orderIndex !== undefined) return -1;
+            if (b.orderIndex !== undefined) return 1;
+            // Default to sorting by created date (newest first) as fallback
+            return b.created - a.created;
+          });
+          
+          resolve(sortedGroups);
         }
       };
       

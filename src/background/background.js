@@ -174,6 +174,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({ success: true });
           break;
           
+        case 'getTabGroup':
+          try {
+            if (!storageService) {
+              throw new Error('Storage service not initialized');
+            }
+            const group = await storageService.getTabGroup(message.id);
+            if (!group) {
+              throw new Error(`Tab group with ID ${message.id} not found`);
+            }
+            sendResponse({ success: true, group });
+          } catch (error) {
+            console.error(`Error getting tab group ${message.id}:`, error);
+            sendResponse({ success: false, error: error.message });
+          }
+          break;
+          
         default:
           sendResponse({ success: false, error: 'Unknown action' });
       }

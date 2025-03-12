@@ -363,7 +363,12 @@ class StorageService {
         metadataMatches.push({
           ...group,
           tabCount: group.tabCount || 0, // Include tab count for UI
-          _matchReason: matchReason     // For debugging
+          _matchReason: matchReason,    // For debugging
+          matchInfo: {
+            field: group.name && group.name.toLowerCase().includes(lowerQuery) ? 'name' : 'date',
+            text: group.name && group.name.toLowerCase().includes(lowerQuery) ? group.name : new Date(group.created).toLocaleString(),
+            query: lowerQuery
+          }
         });
         console.log(`✓ Metadata match for group ${group.id}: ${matchReason}`);
       } else {
@@ -437,13 +442,39 @@ class StorageService {
         if (foundMatch) {
           // Create a result with just the metadata we need (not the full tabs data)
           // We need to construct a new object with just what's needed for display
+          // Determine which field and text matched for highlighting
+          let matchField = '';
+          let matchText = '';
+          
+          for (let i = 0; i < group.tabs.length; i++) {
+            const tab = group.tabs[i];
+            if (tab.title && tab.title.toLowerCase().includes(lowerQuery)) {
+              matchField = 'title';
+              matchText = tab.title;
+              break;
+            } else if (tab.url && tab.url.toLowerCase().includes(lowerQuery)) {
+              matchField = 'url';
+              matchText = tab.url;
+              break;
+            } else if (tab.savedAt && new Date(tab.savedAt).toLocaleString().toLowerCase().includes(lowerQuery)) {
+              matchField = 'date';
+              matchText = new Date(tab.savedAt).toLocaleString();
+              break;
+            }
+          }
+          
           const matchGroup = {
             id: group.id,
             name: group.name,
             created: group.created,
             orderIndex: group.orderIndex,
             tabCount: tabCount,
-            _matchReason: matchReason // For debugging
+            _matchReason: matchReason, // For debugging
+            matchInfo: {
+              field: matchField, 
+              text: matchText,
+              query: lowerQuery
+            }
           };
           
           contentMatches.push(matchGroup);

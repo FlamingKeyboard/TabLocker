@@ -17,6 +17,59 @@ import './toast.css';
 // Create a simple notification manager
 const notificationManager = createNotificationManager();
 
+// Highlight text helper - highlights matching parts of text based on search query
+function HighlightText({ text, searchQuery, className = '' }) {
+  // If no search query or no matchInfo, just return the text
+  if (!searchQuery || !text) {
+    return <span className={className}>{text}</span>;
+  }
+  
+  // Case insensitive search
+  const lowerText = text.toLowerCase();
+  const lowerQuery = searchQuery.toLowerCase();
+  
+  if (!lowerText.includes(lowerQuery)) {
+    return <span className={className}>{text}</span>;
+  }
+  
+  const parts = [];
+  let lastIndex = 0;
+  let startIndex = lowerText.indexOf(lowerQuery);
+  
+  while (startIndex !== -1) {
+    // Add the non-matching part before the match
+    if (startIndex > lastIndex) {
+      parts.push(
+        <span key={`text-${lastIndex}`}>
+          {text.substring(lastIndex, startIndex)}
+        </span>
+      );
+    }
+    
+    // Add the matching part with highlighting
+    parts.push(
+      <span key={`highlight-${startIndex}`} className="search-highlight">
+        {text.substring(startIndex, startIndex + lowerQuery.length)}
+      </span>
+    );
+    
+    // Move past this match for the next iteration
+    lastIndex = startIndex + lowerQuery.length;
+    startIndex = lowerText.indexOf(lowerQuery, lastIndex);
+  }
+  
+  // Add any text after the last match
+  if (lastIndex < text.length) {
+    parts.push(
+      <span key={`text-end`}>
+        {text.substring(lastIndex)}
+      </span>
+    );
+  }
+  
+  return <span className={className}>{parts}</span>;
+}
+
 // Tab Group Component
 function TabGroup({ group, onRestore, onDelete, onRestoreTab, onReorderTabs, onUpdateGroup, onUpdateTab, dragHandleProps }) {
   const [expanded, setExpanded] = useState(false);
@@ -27,6 +80,8 @@ function TabGroup({ group, onRestore, onDelete, onRestoreTab, onReorderTabs, onU
   const [editingTabIndex, setEditingTabIndex] = useState(null);
   const [editingTabField, setEditingTabField] = useState(null); // 'title' or 'url'
   const [editingTabValue, setEditingTabValue] = useState('');
+  const [fullTabData, setFullTabData] = useState(null);
+  const [loadingTabs, setLoadingTabs] = useState(false);
   
   // Add isEditing flag to the group object to track if any editing is happening
   // This will be used by parent component to disable dragging of all groups when any group is being edited
@@ -71,12 +126,51 @@ function TabGroup({ group, onRestore, onDelete, onRestoreTab, onReorderTabs, onU
       setDragOverTabIndex(null);
     }
   };
+  
+  // Load full tab data if not already available
+  // This is particularly important for search results which may not have the full tabs data
+  const loadFullTabDataIfNeeded = async () => {
+    // If we already have tabs data or are already loading, don't reload
+    if ((group.tabs && group.tabs.length > 0) || fullTabData || loadingTabs) {
+      return;
+    }
+    
+    console.log(`Loading full tab data for group ${group.id}`);
+    setLoadingTabs(true);
+    
+    try {
+      // Use the existing StorageService instance
+      chrome.runtime.sendMessage(
+        { action: 'getTabGroup', id: group.id },
+        (response) => {
+          if (response && response.success && response.group) {
+            const fullGroup = response.group;
+            console.log(`Successfully loaded ${fullGroup.tabs ? fullGroup.tabs.length : 0} tabs for group ${group.id}`);
+            setFullTabData(fullGroup);
+          } else {
+            console.error(`Failed to load tab data for group ${group.id}`, response?.error || 'Unknown error');
+          }
+          setLoadingTabs(false);
+        }
+      );
+    } catch (error) {
+      console.error(`Error loading tab data for group ${group.id}:`, error);
+      setLoadingTabs(false);
+    }
+  };
 
   // Reset drag states
   const handleTabDragEnd = () => {
     setDraggedTabIndex(null);
     setDragOverTabIndex(null);
   };
+
+  // Handle expansion state change
+  useEffect(() => {
+    if (expanded) {
+      loadFullTabDataIfNeeded();
+    }
+  }, [expanded]);
 
   return (
     <div className="tab-group" {...(dragHandleProps || {})}>
@@ -122,7 +216,14 @@ function TabGroup({ group, onRestore, onDelete, onRestoreTab, onReorderTabs, onU
           ) : (
             <div className="group-name-container">
               <h3 className="tab-group-name">
-                {group.name}
+                {group.matchInfo && group.matchInfo.field === 'name' ? (
+                  <HighlightText 
+                    text={group.name} 
+                    searchQuery={group.matchInfo.query} 
+                  />
+                ) : (
+                  group.name
+                )}
                 <button 
                   className="btn-icon edit-icon" 
                   onClick={(e) => {
@@ -137,7 +238,16 @@ function TabGroup({ group, onRestore, onDelete, onRestoreTab, onReorderTabs, onU
             </div>
           )}
           <div className="tab-group-meta">
-            <span className="tab-group-date">{formatDate(group.created)}</span>
+            <span className="tab-group-date">
+              {group.matchInfo && group.matchInfo.field === 'date' ? (
+                <HighlightText 
+                  text={formatDate(group.created)} 
+                  searchQuery={group.matchInfo.query} 
+                />
+              ) : (
+                formatDate(group.created)
+              )}
+            </span>
             <span className="tab-group-count">{group.tabCount} tab{group.tabCount !== 1 && 's'}</span>
           </div>
         </div>
@@ -172,9 +282,22 @@ function TabGroup({ group, onRestore, onDelete, onRestoreTab, onReorderTabs, onU
         </div>
       </div>
       
-      {expanded && group.tabs && (
+      {expanded && (
         <div className="tab-list">
-          {group.tabs.map((tab, index) => (
+          {loadingTabs && (
+            <div className="loading-tabs">
+              <p>Loading tabs...</p>
+            </div>
+          )}
+          
+          {!loadingTabs && !fullTabData && !group.tabs && (
+            <div className="no-tabs">
+              <p>No tabs available. This might be due to a data loading issue.</p>
+            </div>
+          )}
+          
+          {((fullTabData && fullTabData.tabs) || group.tabs) && 
+           ((fullTabData ? fullTabData.tabs : group.tabs).map((tab, index) => (
             <div 
               key={index} 
               className={`tab-item ${draggedTabIndex === index ? 'tab-dragging' : ''} ${dragOverTabIndex === index ? 'tab-drag-over' : ''}`}
@@ -236,7 +359,14 @@ function TabGroup({ group, onRestore, onDelete, onRestoreTab, onReorderTabs, onU
                       }
                     }}
                   >
-                    {tab.title || "Untitled Tab"}
+                    {group.matchInfo && group.matchInfo.field === 'title' ? (
+                      <HighlightText 
+                        text={tab.title || "Untitled Tab"} 
+                        searchQuery={group.matchInfo.query} 
+                      />
+                    ) : (
+                      tab.title || "Untitled Tab"
+                    )}
                     <button 
                       className="btn-icon edit-icon" 
                       onClick={(e) => {
@@ -325,7 +455,14 @@ function TabGroup({ group, onRestore, onDelete, onRestoreTab, onReorderTabs, onU
                       }
                     }}
                   >
-                    {tab.url}
+                    {group.matchInfo && group.matchInfo.field === 'url' ? (
+                      <HighlightText 
+                        text={tab.url} 
+                        searchQuery={group.matchInfo.query} 
+                      />
+                    ) : (
+                      tab.url
+                    )}
                     <button 
                       className="btn-icon edit-icon" 
                       onClick={(e) => {
@@ -350,7 +487,7 @@ function TabGroup({ group, onRestore, onDelete, onRestoreTab, onReorderTabs, onU
                 <Icon name="external-link" /> Restore
               </button>
             </div>
-          ))}
+          )))}
         </div>
       )}
     </div>

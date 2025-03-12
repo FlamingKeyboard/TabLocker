@@ -1,27 +1,24 @@
-# TabLocker TODO List
+# 🔒 TabLocker: Project Roadmap & Tasks
 
-## Research Findings
+> *Secure your tabs. Organize your workflow. Take control of your browser experience.*
 
-### OneTab Analysis
-- OneTab stores data in local browser storage
-- Basic data format is URLs with page titles
-- No encryption by default
-- Exports data as plain text in a simple format: `URL | Title`
-- Allows sharing via a public URL (which we will NOT implement for privacy)
+![Status](https://img.shields.io/badge/Status-In%20Progress-brightgreen)
+![Version](https://img.shields.io/badge/Version-0.9.0-blue)
+![Last Updated](https://img.shields.io/badge/Last%20Updated-March%2012%2C%202025-orange)
 
-### Browser Extension Requirements
-- Chrome, Firefox, Edge, and Opera each have slightly different APIs
-- Manifest V3 is required for Chrome Web Store (and Edge)
-- Firefox requires an `applications` section in the manifest
-- Firefox still supports Manifest V2, but we'll use Manifest V3 for cross-browser support
+## 📊 Project Status
 
-### Security Considerations
-- AES-256-GCM is currently considered secure
-- Web Crypto API provides good performance for encryption operations
-- Post-quantum algorithms like CRYSTALS-Kyber can be layered on top later
-- Key storage is a challenge; will store keys locally with optional PIN protection
+| Category | Progress | Description |
+|----------|----------|-------------|
+| Core Features | ⬛⬛⬛⬛⬛⬛⬛⬛⬛⬜ 90% | Basic functionality complete, polishing remaining |
+| UI/UX | ⬛⬛⬛⬛⬛⬛⬛⬜⬜⬜ 75% | Main interface implemented, enhancements ongoing |
+| Security | ⬛⬛⬛⬛⬛⬛⬛⬛⬜⬜ 85% | Encryption in place, audit pending |
+| Testing | ⬛⬛⬛⬜⬜⬜⬜⬜⬜⬜ 30% | Manual testing done, automated tests needed |
+| Documentation | ⬛⬛⬛⬛⬛⬛⬜⬜⬜⬜ 60% | Core docs in place, needs expansion |
 
-## Implementation Tasks
+---
+
+## ✅ Implementation Tasks
 
 ### Core Features
 - [x] Tab saving functionality
@@ -31,51 +28,81 @@
 - [x] Basic tab restoration
 - [x] Tab search
 - [x] Export/import functionality
-- [x] Preact UI components
+  - [x] OneTab format compatibility
+  - [x] Single URL imports
+  - [x] Tab group imports (separated by empty lines)
+  - [x] File import button
+  - [x] Copy-to-clipboard export option
+- [x] Modern UI with Preact components
+- [x] Toast notifications for user interactions
 
-### To Be Implemented
+### 🚧 In Progress
 - [ ] Create proper icons for the extension
+- [ ] Add option to sort tabs by domain
+- [ ] Implement tab deduplication
+- [ ] Add dark mode support
+
+### 📝 Planned Features
 - [ ] Implement automated tests
 - [ ] Add keyboard shortcuts
 - [ ] Browser-specific adaptations
-- [ ] Add option to sort tabs by domain
-- [ ] Add option to save tabs as markdown
-- [ ] Implement tab deduplication
-- [ ] Add dark mode support
-- [ ] Add language translations
-- [ ] Consider implementing a sidebar view (similar to Firefox's sidebar)
 
-### Future Enhancements
+### 🔮 Future Enhancements
 - [ ] Layer post-quantum encryption (research CRYSTALS-Kyber implementation)
-- [ ] Implement a desktop companion app for local backup
-- [ ] Create sync mechanism between different browsers via local network
-- [ ] Add support for tab groups in UI (already supported in storage layer)
+- [ ] Add support for tab groups in UI
 - [ ] Add advanced search with regular expressions
-- [ ] Consider adding tagging system for tabs
-- [ ] Implement browser context restoration (window positions, sizes)
-- [ ] Add option for bookmark integration
+- [ ] Implement tagging system for tabs
 
-## Technical Debt
-- Review encryption implementation for audit
-- Consider optimizing IndexedDB operations for large collections
-- Improve error handling throughout the application
-- Add more robust validation for import/export functions
+---
 
-## Release Process
-1. Complete core functionality
-2. Add proper testing and fix bugs
-3. Create proper icons and UI polish
+## 🛠️ Technical Considerations
+
+### Technical Debt
+- 🔍 Review encryption implementation for audit
+- ⚡ Optimize IndexedDB operations for large collections
+- 🐛 Improve error handling throughout the application
+- ✓ Add robust validation for import/export functions (Partly addressed in March 2025)
+
+### Performance Optimizations
+- Lazy loading of tab data for faster UI rendering
+- Consider using web workers for encryption operations
+- Implement virtualized lists for large tab collections
+- Add option to automatically archive older tabs
+
+---
+
+## 🚀 Release Process
+
+### Release Pipeline
+1. ✓ Complete core functionality
+2. 🚧 Add proper testing and fix bugs
+3. 🚧 Create proper icons and UI polish
 4. Submit to browser extension stores:
-   - Chrome Web Store
-   - Firefox Add-ons
-   - Microsoft Edge Add-ons
-   - Opera Add-ons
+   - 🛒 Chrome Web Store
+   - 🦊 Firefox Add-ons
+   - 🌐 Microsoft Edge Add-ons
+   - 🔴 Opera Add-ons
 
-## Ideas to Explore
-- Implement a "suspend tabs after time" feature
-- Consider periodic local backups
-- Add a "declutter" feature to group similar tabs
-- Research how to handle tab history (forward/back state)
-- Explore ways to preview tab content without loading the page
-- Consider a feature to schedule tab restoration (for recurring tabs)
-- Implement a "reading mode" integration for articles
+---
+
+## 💡 Ideas & Inspiration
+
+### Productivity Features
+- **Workspaces**: Create dedicated tab collections for different projects. Whitelisted URLs will be automatically place in their respective workspaces
+
+### UX Enhancements
+- **Smart Search**: Use locally running AI (Ollama) to categorize, auto label, and find tabs based on content
+- **Tab Thumbnails**: Generate and store thumbnails for visual browsing (encrypted?)
+
+---
+
+## 🤝 Community & Contributions
+
+### Privacy Commitment
+- **No analytics or tracking** in the extension
+- All data stored locally by default
+- Encryption as a first-class feature
+
+---
+
+*"TabLocker: Keep your tabs secure, organized, and at your fingertips."*

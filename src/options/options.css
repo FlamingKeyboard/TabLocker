@@ -577,7 +577,6 @@ small {
 .search-highlight {
   background-color: rgba(255, 255, 0, 0.4);
   border-radius: 2px;
-  padding: 0 2px;
   font-weight: bold;
   color: var(--gray-900);
   display: inline-block;

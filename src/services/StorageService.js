@@ -343,8 +343,8 @@ class StorageService {
       let isMatch = false;
       let matchReason = '';
       
-      // Check group name
-      if (group.name && group.name.toLowerCase().includes(lowerQuery)) {
+      // Check group name - case-insensitive string match
+      if (group.name && group.name.toLowerCase().indexOf(lowerQuery) !== -1) {
         isMatch = true;
         matchReason = `Group name match: "${group.name}" contains "${lowerQuery}"`;
       }
@@ -353,7 +353,7 @@ class StorageService {
       if (!isMatch && group.created) {
         const dateStr = new Date(group.created).toLocaleString().toLowerCase();
         console.log(`Group ${group.id} date string: "${dateStr}"`);
-        if (dateStr.includes(lowerQuery)) {
+        if (dateStr.indexOf(lowerQuery) !== -1) {
           isMatch = true;
           matchReason = `Date/time match: "${dateStr}" contains "${lowerQuery}"`;
         }
@@ -365,8 +365,8 @@ class StorageService {
           tabCount: group.tabCount || 0, // Include tab count for UI
           _matchReason: matchReason,    // For debugging
           matchInfo: {
-            field: group.name && group.name.toLowerCase().includes(lowerQuery) ? 'name' : 'date',
-            text: group.name && group.name.toLowerCase().includes(lowerQuery) ? group.name : new Date(group.created).toLocaleString(),
+            field: group.name && group.name.toLowerCase().indexOf(lowerQuery) !== -1 ? 'name' : 'date',
+            text: group.name && group.name.toLowerCase().indexOf(lowerQuery) !== -1 ? group.name : new Date(group.created).toLocaleString(),
             query: lowerQuery
           }
         });
@@ -413,15 +413,15 @@ class StorageService {
         for (let i = 0; i < group.tabs.length; i++) {
           const tab = group.tabs[i];
           
-          // Check tab title
-          if (tab.title && tab.title.toLowerCase().includes(lowerQuery)) {
+          // Check tab title - case-insensitive string match
+          if (tab.title && tab.title.toLowerCase().indexOf(lowerQuery) !== -1) {
             foundMatch = true;
             matchReason = `Tab ${i} title match: "${tab.title}" contains "${lowerQuery}"`;
             break;
           }
           
-          // Check tab URL
-          if (tab.url && tab.url.toLowerCase().includes(lowerQuery)) {
+          // Check tab URL - case-insensitive string match
+          if (tab.url && tab.url.toLowerCase().indexOf(lowerQuery) !== -1) {
             foundMatch = true;
             matchReason = `Tab ${i} URL match: "${tab.url}" contains "${lowerQuery}"`;
             break;
@@ -431,7 +431,7 @@ class StorageService {
           if (tab.savedAt) {
             const tabDateStr = new Date(tab.savedAt).toLocaleString().toLowerCase();
             console.log(`Tab ${i} date string: "${tabDateStr}"`);
-            if (tabDateStr.includes(lowerQuery)) {
+            if (tabDateStr.indexOf(lowerQuery) !== -1) {
               foundMatch = true;
               matchReason = `Tab ${i} date match: "${tabDateStr}" contains "${lowerQuery}"`;
               break;
@@ -448,15 +448,15 @@ class StorageService {
           
           for (let i = 0; i < group.tabs.length; i++) {
             const tab = group.tabs[i];
-            if (tab.title && tab.title.toLowerCase().includes(lowerQuery)) {
+            if (tab.title && tab.title.toLowerCase().indexOf(lowerQuery) !== -1) {
               matchField = 'title';
               matchText = tab.title;
               break;
-            } else if (tab.url && tab.url.toLowerCase().includes(lowerQuery)) {
+            } else if (tab.url && tab.url.toLowerCase().indexOf(lowerQuery) !== -1) {
               matchField = 'url';
               matchText = tab.url;
               break;
-            } else if (tab.savedAt && new Date(tab.savedAt).toLocaleString().toLowerCase().includes(lowerQuery)) {
+            } else if (tab.savedAt && new Date(tab.savedAt).toLocaleString().toLowerCase().indexOf(lowerQuery) !== -1) {
               matchField = 'date';
               matchText = new Date(tab.savedAt).toLocaleString();
               break;

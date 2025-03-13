@@ -1071,7 +1071,7 @@ function Icon({ name, className = '', size = '1em', ...rest }) {
     'upload-cloud': <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`feather feather-upload-cloud ${className}`} style={{ width: size, height: size }} {...rest}><polyline points="16 16 12 12 8 16"></polyline><line x1="12" y1="12" x2="12" y2="21"></line><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path><polyline points="16 16 12 12 8 16"></polyline></svg>,
     
     // Settings icons
-    'settings': <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`feather feather-settings ${className}`} style={{ width: size, height: size }} {...rest}><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>,
+    'settings': <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`feather feather-settings ${className}`} style={{ width: size, height: size }} {...rest}><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 1 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 1-1.82-.33 1.65 1.65 0 0 1-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 1-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>,
     
     'save': <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`feather feather-save ${className}`} style={{ width: size, height: size }} {...rest}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>,
     
@@ -1250,13 +1250,98 @@ function Options() {
   // Handle search
   const handleSearch = (query) => {
     console.log('handleSearch called with query:', query);
-    setSearchQuery(query);
     setLoading(true);
     
-    // Reload tab groups with the search query
-    loadTabGroups().finally(() => {
-      setLoading(false);
-    });
+    // Use the query parameter directly instead of relying on the searchQuery state
+    // which might not be updated yet due to React's asynchronous state updates
+    setSearchQuery(query);
+    
+    // Create a modified version of loadTabGroups that uses the query parameter
+    const performSearch = async () => {
+      try {
+        console.log('Performing search with query:', query);
+        let groups;
+        
+        if (query) {
+          console.log('Calling searchTabGroups with query:', query);
+          groups = await storageService.searchTabGroups(query);
+          console.log('Search returned', groups.length, 'results');
+        } else {
+          console.log('Getting all tab groups');
+          groups = await storageService.getAllTabGroups();
+        }
+        
+        console.log('Processing search results...');
+        
+        // If this is a search result, we need a different approach
+        if (query) {
+          console.log('Search mode: Will display results directly without reloading full data');
+          
+          // For search results, we'll use the metadata we already have
+          // and add tab counts where available
+          const searchResultGroups = [];
+          
+          for (let i = 0; i < groups.length; i++) {
+            try {
+              const group = groups[i];
+              // Add debugging information to track which search terms matched
+              console.log(`Including search result ${i+1}/${groups.length}: Group ID ${group.id}, Name: ${group.name}`);
+              
+              // For search results, we only need minimal processing
+              // The full details are already loaded by searchTabGroups
+              searchResultGroups.push({
+                ...group,
+                tabCount: group.tabCount || 0, // Use existing count or default to 0
+                _searchMatch: true // Mark as a search match for debugging
+              });
+            } catch (error) {
+              console.error(`Error processing search result ${groups[i]?.id}:`, error);
+            }
+          }
+          
+          console.log(`Setting tab groups with ${searchResultGroups.length} search results`);
+          setTabGroups(searchResultGroups);
+        } else {
+          // Normal loading (not search)
+          console.log('Normal mode: Loading full data for each group');
+          const fullGroups = [];
+          let needsOrderUpdate = false;
+          
+          for (let i = 0; i < groups.length; i++) {
+            try {
+              const group = groups[i];
+              const fullGroup = await storageService.getTabGroup(group.id);
+              
+              // Check if orderIndex needs to be initialized
+              if (fullGroup && fullGroup.orderIndex === undefined) {
+                fullGroup.orderIndex = i;
+                needsOrderUpdate = true;
+                // Update in background without waiting
+                storageService.updateTabGroup(fullGroup.id, { orderIndex: i })
+                  .catch(err => console.error(`Error setting initial orderIndex for group ${fullGroup.id}:`, err));
+              }
+              
+              if (fullGroup) {
+                fullGroup.tabCount = fullGroup.tabs ? fullGroup.tabs.length : 0;
+                fullGroups.push(fullGroup);
+              }
+            } catch (error) {
+              console.error(`Error loading group ${group.id}:`, error);
+            }
+          }
+          
+          console.log(`Setting tab groups with ${fullGroups.length} groups from normal load`);
+          setTabGroups(fullGroups);
+        }
+      } catch (error) {
+        console.error('Error loading tab groups:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    // Execute the search immediately
+    performSearch();
   };
   
   // Handle restore tab group

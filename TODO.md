@@ -52,6 +52,9 @@
 - [ ] Add support for tab groups in UI
 - [ ] Add advanced search with regular expressions
 - [ ] Implement tagging system for tabs
+  - [ ] Manual tagging for tab groups
+  - [ ] Future: Basic logic for automatic tagging
+  - [ ] Future: Optional Ollama integration for smart tagging
 
 ---
 

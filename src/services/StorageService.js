@@ -15,7 +15,7 @@ class StorageService {
    */
   constructor(password = null) {
     this.dbName = 'TabLockerDB';
-    this.dbVersion = 1;
+    this.dbVersion = 2;
     this.db = null;
     this.isReady = false;
     this.compressionService = new CompressionService();

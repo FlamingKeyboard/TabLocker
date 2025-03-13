@@ -10,6 +10,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import StorageService from '../services/StorageService';
 import ExportImportService from '../services/ExportImportService';
 import TabService from '../services/TabService';
+import TabGroupTags from './TabGroupTags';
 import { createNotificationManager } from '../components/Toast';
 import './options.css';
 import './toast.css';
@@ -250,6 +251,8 @@ function TabGroup({ group, onRestore, onDelete, onRestoreTab, onReorderTabs, onU
             </span>
             <span className="tab-group-count">{group.tabCount} tab{group.tabCount !== 1 && 's'}</span>
           </div>
+          {/* Add tag management for this group */}
+          <TabGroupTags groupId={group.id} tags={group.tags || []} />
         </div>
         
         <div className="tab-group-actions">
@@ -1049,6 +1052,317 @@ function Settings({ settings, onSaveSettings }) {
   );
 }
 
+// Tags Component for managing tags
+function Tags({ onTagsUpdate }) {
+  const [tags, setTags] = useState([]);
+  const [newTagName, setNewTagName] = useState('');
+  const [newTagColor, setNewTagColor] = useState('#3498db'); // Default blue color
+  const [editingTag, setEditingTag] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState(null);
+
+  // Available color presets for tags
+  const colorPresets = [
+    '#3498db', // Blue
+    '#2ecc71', // Green
+    '#e74c3c', // Red
+    '#f39c12', // Orange
+    '#9b59b6', // Purple
+    '#1abc9c', // Teal
+    '#e67e22', // Dark Orange
+    '#95a5a6', // Gray
+  ];
+
+  // Load tags on component mount
+  useEffect(() => {
+    const loadTags = async () => {
+      try {
+        setLoading(true);
+        const storageService = new StorageService();
+        const allTags = await storageService.getAllTags();
+        setTags(allTags);
+      } catch (error) {
+        console.error('Error loading tags:', error);
+        setMessage({ type: 'error', text: `Error loading tags: ${error.message}` });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTags();
+  }, []);
+
+  // Create a new tag
+  const handleCreateTag = async () => {
+    if (!newTagName.trim()) {
+      setMessage({ type: 'error', text: 'Tag name cannot be empty' });
+      return;
+    }
+
+    try {
+      const storageService = new StorageService();
+      
+      // Check if a tag with the same name already exists
+      const existingTags = await storageService.getAllTags();
+      if (existingTags.some(tag => tag.name.toLowerCase() === newTagName.trim().toLowerCase())) {
+        setMessage({ type: 'error', text: 'A tag with this name already exists' });
+        return;
+      }
+      
+      const newTag = {
+        name: newTagName.trim(),
+        color: newTagColor,
+        createdAt: new Date().toISOString()
+      };
+      
+      const tagId = await storageService.createTag(newTag);
+      newTag.id = tagId;
+      
+      setTags([...tags, newTag]);
+      setNewTagName('');
+      setMessage({ type: 'success', text: 'Tag created successfully' });
+      
+      // Clear message after 2 seconds
+      setTimeout(() => setMessage(null), 2000);
+      
+      // Notify parent component
+      if (onTagsUpdate) {
+        onTagsUpdate();
+      }
+    } catch (error) {
+      console.error('Error creating tag:', error);
+      setMessage({ type: 'error', text: `Error creating tag: ${error.message}` });
+    }
+  };
+
+  // Start editing a tag
+  const handleEditTag = (tag) => {
+    setEditingTag({
+      ...tag,
+      name: tag.name,
+      color: tag.color
+    });
+  };
+
+  // Save edited tag
+  const handleSaveEdit = async () => {
+    if (!editingTag.name.trim()) {
+      setMessage({ type: 'error', text: 'Tag name cannot be empty' });
+      return;
+    }
+
+    try {
+      const storageService = new StorageService();
+      
+      // Check if a tag with the same name already exists (excluding current tag)
+      const existingTags = await storageService.getAllTags();
+      const nameExists = existingTags.some(
+        tag => tag.id !== editingTag.id && 
+        tag.name.toLowerCase() === editingTag.name.trim().toLowerCase()
+      );
+      
+      if (nameExists) {
+        setMessage({ type: 'error', text: 'A tag with this name already exists' });
+        return;
+      }
+      
+      const updatedTag = {
+        ...editingTag,
+        name: editingTag.name.trim()
+      };
+      
+      await storageService.updateTag(updatedTag);
+      
+      setTags(tags.map(tag => tag.id === updatedTag.id ? updatedTag : tag));
+      setEditingTag(null);
+      setMessage({ type: 'success', text: 'Tag updated successfully' });
+      
+      // Clear message after 2 seconds
+      setTimeout(() => setMessage(null), 2000);
+      
+      // Notify parent component
+      if (onTagsUpdate) {
+        onTagsUpdate();
+      }
+    } catch (error) {
+      console.error('Error updating tag:', error);
+      setMessage({ type: 'error', text: `Error updating tag: ${error.message}` });
+    }
+  };
+
+  // Cancel editing
+  const handleCancelEdit = () => {
+    setEditingTag(null);
+  };
+
+  // Delete a tag
+  const handleDeleteTag = async (tagId) => {
+    if (!window.confirm('Are you sure you want to delete this tag? This will remove it from all tab groups.')) {
+      return;
+    }
+
+    try {
+      const storageService = new StorageService();
+      
+      await storageService.deleteTag(tagId);
+      
+      setTags(tags.filter(tag => tag.id !== tagId));
+      setMessage({ type: 'success', text: 'Tag deleted successfully' });
+      
+      // Clear message after 2 seconds
+      setTimeout(() => setMessage(null), 2000);
+      
+      // Notify parent component
+      if (onTagsUpdate) {
+        onTagsUpdate();
+      }
+    } catch (error) {
+      console.error('Error deleting tag:', error);
+      setMessage({ type: 'error', text: `Error deleting tag: ${error.message}` });
+    }
+  };
+
+  return (
+    <div className="tags-container">
+      <h2>Manage Tags</h2>
+      
+      {message && (
+        <div className={`notification ${message.type}`}>
+          {message.text}
+        </div>
+      )}
+      
+      <div className="new-tag-form">
+        <h3>Create New Tag</h3>
+        <div className="form-row">
+          <input
+            type="text"
+            placeholder="Tag name"
+            value={newTagName}
+            onChange={(e) => setNewTagName(e.target.value)}
+          />
+          
+          <div className="color-selector">
+            <input
+              type="color"
+              value={newTagColor}
+              onChange={(e) => setNewTagColor(e.target.value)}
+            />
+            <span>Color</span>
+          </div>
+          
+          <button 
+            className="btn btn-primary"
+            onClick={handleCreateTag}
+          >
+            <Icon name="plus" /> Create Tag
+          </button>
+        </div>
+        
+        <div className="color-presets">
+          {colorPresets.map(color => (
+            <div
+              key={color}
+              className={`color-preset ${color === newTagColor ? 'selected' : ''}`}
+              style={{ backgroundColor: color }}
+              onClick={() => setNewTagColor(color)}
+            />
+          ))}
+        </div>
+      </div>
+      
+      <div className="tags-list">
+        <h3>Your Tags</h3>
+        
+        {loading ? (
+          <div className="loading">Loading tags...</div>
+        ) : tags.length === 0 ? (
+          <div className="empty-state">
+            <p>No tags found. Create your first tag above.</p>
+          </div>
+        ) : (
+          <ul>
+            {tags.map(tag => (
+              <li key={tag.id} className="tag-item">
+                {editingTag && editingTag.id === tag.id ? (
+                  // Edit mode
+                  <div className="tag-edit-form">
+                    <input
+                      type="text"
+                      value={editingTag.name}
+                      onChange={(e) => setEditingTag({...editingTag, name: e.target.value})}
+                    />
+                    
+                    <div className="color-selector">
+                      <input
+                        type="color"
+                        value={editingTag.color}
+                        onChange={(e) => setEditingTag({...editingTag, color: e.target.value})}
+                      />
+                    </div>
+                    
+                    <div className="color-presets">
+                      {colorPresets.map(color => (
+                        <div
+                          key={color}
+                          className={`color-preset ${color === editingTag.color ? 'selected' : ''}`}
+                          style={{ backgroundColor: color }}
+                          onClick={() => setEditingTag({...editingTag, color})}
+                        />
+                      ))}
+                    </div>
+                    
+                    <div className="tag-edit-actions">
+                      <button 
+                        className="btn btn-primary"
+                        onClick={handleSaveEdit}
+                      >
+                        <Icon name="save" /> Save
+                      </button>
+                      <button 
+                        className="btn btn-secondary"
+                        onClick={handleCancelEdit}
+                      >
+                        <Icon name="x" /> Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  // View mode
+                  <div className="tag-details">
+                    <div 
+                      className="tag-color" 
+                      style={{ backgroundColor: tag.color }}
+                    />
+                    <span className="tag-name">{tag.name}</span>
+                    
+                    <div className="tag-actions">
+                      <button 
+                        className="btn-icon"
+                        onClick={() => handleEditTag(tag)}
+                        title="Edit tag"
+                      >
+                        <Icon name="edit-2" />
+                      </button>
+                      <button 
+                        className="btn-icon btn-danger"
+                        onClick={() => handleDeleteTag(tag.id)}
+                        title="Delete tag"
+                      >
+                        <Icon name="trash-2" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Custom SVG icon component that doesn't rely on external libraries
 function Icon({ name, className = '', size = '1em', ...rest }) {
   // Collection of SVG path data for different icons
@@ -1098,7 +1412,11 @@ function Icon({ name, className = '', size = '1em', ...rest }) {
     
     'database': <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`feather feather-database ${className}`} style={{ width: size, height: size }} {...rest}><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>,
     
-    'layers': <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`feather feather-layers ${className}`} style={{ width: size, height: size }} {...rest}><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+    'layers': <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`feather feather-layers ${className}`} style={{ width: size, height: size }} {...rest}><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>,
+    
+    'tag': <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`feather feather-tag ${className}`} style={{ width: size, height: size }} {...rest}><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>,
+    
+    'plus': <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`feather feather-plus ${className}`} style={{ width: size, height: size }} {...rest}><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>,
   };
   
   // Return the SVG for the requested icon, or null if not found
@@ -1661,6 +1979,12 @@ function Options() {
             <Icon name="database" /> Saved Tabs
           </li>
           <li 
+            className={activeTab === 'tags' ? 'active' : ''}
+            onClick={() => setActiveTab('tags')}
+          >
+            <Icon name="tag" /> Tags
+          </li>
+          <li 
             className={activeTab === 'export-import' ? 'active' : ''}
             onClick={() => setActiveTab('export-import')}
           >
@@ -1729,6 +2053,10 @@ function Options() {
             settings={settings}
             onSaveSettings={handleSaveSettings}
           />
+        )}
+        
+        {activeTab === 'tags' && (
+          <Tags onTagsUpdate={() => loadTabGroups()} />
         )}
       </main>
       

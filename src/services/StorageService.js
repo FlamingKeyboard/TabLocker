@@ -15,7 +15,7 @@ class StorageService {
    */
   constructor(password = null) {
     this.dbName = 'TabLockerDB';
-    this.dbVersion = 2;
+    this.dbVersion = 3;
     this.db = null;
     this.isReady = false;
     this.compressionService = new CompressionService();
@@ -42,6 +42,7 @@ class StorageService {
       
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
+        const oldVersion = event.oldVersion;
         
         // Create object stores if they don't exist
         if (!db.objectStoreNames.contains('tabGroups')) {
@@ -53,6 +54,22 @@ class StorageService {
         
         if (!db.objectStoreNames.contains('settings')) {
           db.createObjectStore('settings', { keyPath: 'key' });
+        }
+        
+        // For version 3, add tags support
+        if (oldVersion < 3) {
+          // Create tags store if it doesn't exist
+          if (!db.objectStoreNames.contains('tags')) {
+            const tagsStore = db.createObjectStore('tags', { keyPath: 'id' });
+            tagsStore.createIndex('name', 'name', { unique: true });
+            tagsStore.createIndex('created', 'created', { unique: false });
+          }
+          
+          // Add 'tags' index to tabGroups if it doesn't exist
+          const tabGroupsStore = request.transaction.objectStore('tabGroups');
+          if (!tabGroupsStore.indexNames.contains('tags')) {
+            tabGroupsStore.createIndex('tags', 'tags', { unique: false, multiEntry: true });
+          }
         }
       };
       
@@ -538,13 +555,268 @@ class StorageService {
   async clearAllData() {
     await this.ensureDBReady();
     
-    const transaction = this.db.transaction(['tabGroups', 'settings'], 'readwrite');
+    const transaction = this.db.transaction(['tabGroups', 'settings', 'tags'], 'readwrite');
     transaction.objectStore('tabGroups').clear();
     transaction.objectStore('settings').clear();
+    transaction.objectStore('tags').clear();
     
     return new Promise((resolve, reject) => {
       transaction.oncomplete = () => resolve();
       transaction.onerror = (event) => reject(event.target.error);
+    });
+  }
+
+  /**
+   * Create a new tag
+   * @param {Object} tag - Tag object with name
+   * @returns {Promise<string>} - ID of the created tag
+   */
+  async createTag(tag) {
+    try {
+      // Ensure tag has required fields
+      if (!tag.id) {
+        tag.id = crypto.randomUUID();
+      }
+      
+      if (!tag.created) {
+        tag.created = Date.now();
+      }
+      
+      if (!tag.name || typeof tag.name !== 'string' || tag.name.trim() === '') {
+        throw new Error('Tag must have a valid name');
+      }
+      
+      // Create a clean tag object
+      const tagToStore = {
+        id: tag.id,
+        name: tag.name.trim(),
+        created: tag.created,
+        color: tag.color || null // Optional color for the tag
+      };
+      
+      // Save to IndexedDB
+      await this.transaction('tags', 'readwrite', (store) => {
+        return store.put(tagToStore);
+      });
+      
+      console.log(`Successfully created tag with ID: ${tagToStore.id}`, tagToStore);
+      return tagToStore.id;
+    } catch (error) {
+      console.error('Error creating tag:', error);
+      throw new Error(`Failed to create tag: ${error.message}`);
+    }
+  }
+  
+  /**
+   * Get all tags
+   * @returns {Promise<Array>} - Array of all tags
+   */
+  async getAllTags() {
+    return new Promise(async (resolve, reject) => {
+      await this.ensureDBReady();
+      
+      const transaction = this.db.transaction('tags', 'readonly');
+      const store = transaction.objectStore('tags');
+      const request = store.index('name').openCursor();
+      
+      const tags = [];
+      
+      request.onsuccess = (event) => {
+        const cursor = event.target.result;
+        if (cursor) {
+          tags.push(cursor.value);
+          cursor.continue();
+        } else {
+          resolve(tags);
+        }
+      };
+      
+      request.onerror = (event) => {
+        reject(event.target.error);
+      };
+    });
+  }
+
+  /**
+   * Get a tag by ID
+   * @param {string} id - ID of the tag
+   * @returns {Promise<Object|null>} - Tag object or null if not found
+   */
+  async getTag(id) {
+    return this.transaction('tags', 'readonly', (store) => {
+      return store.get(id);
+    });
+  }
+  
+  /**
+   * Update a tag
+   * @param {string} id - ID of the tag to update
+   * @param {Object} updates - Fields to update
+   * @returns {Promise<void>}
+   */
+  async updateTag(id, updates) {
+    const tag = await this.getTag(id);
+    
+    if (!tag) {
+      throw new Error('Tag not found');
+    }
+    
+    // Validate updates
+    if (updates.name && (typeof updates.name !== 'string' || updates.name.trim() === '')) {
+      throw new Error('Tag name cannot be empty');
+    }
+    
+    // Merge updates with existing tag
+    const updatedTag = { ...tag, ...updates };
+    if (updates.name) {
+      updatedTag.name = updates.name.trim();
+    }
+    
+    // Save the updated tag
+    return this.transaction('tags', 'readwrite', (store) => {
+      return store.put(updatedTag);
+    });
+  }
+  
+  /**
+   * Delete a tag
+   * @param {string} id - ID of the tag to delete
+   * @returns {Promise<void>}
+   */
+  async deleteTag(id) {
+    try {
+      // First, remove this tag from all tab groups that reference it
+      const allTabGroups = await this.getAllTabGroups();
+      
+      for (const group of allTabGroups) {
+        if (group.tags && group.tags.includes(id)) {
+          // Get the full group with tabs
+          const fullGroup = await this.getTabGroup(group.id);
+          
+          // Remove the tag from the group
+          fullGroup.tags = fullGroup.tags.filter(tagId => tagId !== id);
+          
+          // Save the updated group
+          await this.saveTabGroup(fullGroup);
+        }
+      }
+      
+      // Now delete the tag itself
+      return this.transaction('tags', 'readwrite', (store) => {
+        return store.delete(id);
+      });
+    } catch (error) {
+      console.error('Error deleting tag:', error);
+      throw new Error(`Failed to delete tag: ${error.message}`);
+    }
+  }
+  
+  /**
+   * Add tags to a tab group
+   * @param {string} groupId - ID of the tab group
+   * @param {string|string[]} tagIds - Tag ID or array of tag IDs to add
+   * @returns {Promise<void>}
+   */
+  async addTagsToGroup(groupId, tagIds) {
+    try {
+      // Ensure tagIds is an array
+      const tagIdsArray = Array.isArray(tagIds) ? tagIds : [tagIds];
+      
+      // Validate all tag IDs exist
+      for (const tagId of tagIdsArray) {
+        const tag = await this.getTag(tagId);
+        if (!tag) {
+          throw new Error(`Tag with ID ${tagId} does not exist`);
+        }
+      }
+      
+      // Get the group
+      const group = await this.getTabGroup(groupId);
+      if (!group) {
+        throw new Error(`Tab group with ID ${groupId} not found`);
+      }
+      
+      // Initialize tags array if it doesn't exist
+      if (!group.tags) {
+        group.tags = [];
+      }
+      
+      // Add tags that aren't already applied
+      let tagsChanged = false;
+      for (const tagId of tagIdsArray) {
+        if (!group.tags.includes(tagId)) {
+          group.tags.push(tagId);
+          tagsChanged = true;
+        }
+      }
+      
+      // Only save if tags actually changed
+      if (tagsChanged) {
+        await this.saveTabGroup(group);
+      }
+      
+      return group.tags;
+    } catch (error) {
+      console.error('Error adding tags to group:', error);
+      throw new Error(`Failed to add tags: ${error.message}`);
+    }
+  }
+  
+  /**
+   * Remove tags from a tab group
+   * @param {string} groupId - ID of the tab group
+   * @param {string|string[]} tagIds - Tag ID or array of tag IDs to remove
+   * @returns {Promise<void>}
+   */
+  async removeTagsFromGroup(groupId, tagIds) {
+    try {
+      // Ensure tagIds is an array
+      const tagIdsArray = Array.isArray(tagIds) ? tagIds : [tagIds];
+      
+      // Get the group
+      const group = await this.getTabGroup(groupId);
+      if (!group) {
+        throw new Error(`Tab group with ID ${groupId} not found`);
+      }
+      
+      // If group has no tags, nothing to do
+      if (!group.tags || group.tags.length === 0) {
+        return [];
+      }
+      
+      // Remove the specified tags
+      const originalLength = group.tags.length;
+      group.tags = group.tags.filter(tagId => !tagIdsArray.includes(tagId));
+      
+      // Only save if tags actually changed
+      if (group.tags.length !== originalLength) {
+        await this.saveTabGroup(group);
+      }
+      
+      return group.tags;
+    } catch (error) {
+      console.error('Error removing tags from group:', error);
+      throw new Error(`Failed to remove tags: ${error.message}`);
+    }
+  }
+  
+  /**
+   * Get all tab groups with specific tags
+   * @param {string|string[]} tagIds - Tag ID or array of tag IDs to filter by
+   * @returns {Promise<Array>} - Array of tab groups with the specified tags
+   */
+  async getGroupsByTags(tagIds) {
+    const tagIdsArray = Array.isArray(tagIds) ? tagIds : [tagIds];
+    
+    // Get all groups
+    const allGroups = await this.getAllTabGroups();
+    
+    // Filter groups that have all the specified tags
+    return allGroups.filter(group => {
+      if (!group.tags) return false;
+      
+      // Check if all specified tags are present in the group
+      return tagIdsArray.every(tagId => group.tags.includes(tagId));
     });
   }
 }
